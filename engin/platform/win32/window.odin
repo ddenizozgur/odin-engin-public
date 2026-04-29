@@ -10,8 +10,6 @@ import "core:sys/windows"
 */
 
 get_dpi_scale :: proc() -> f32 {
-	// if os.is_windows_7() do return 1. // check
-
 	dpi := windows.GetDpiForWindow(_hwnd)
 	return cast(f32)dpi / 96.
 }
@@ -79,11 +77,6 @@ window_init :: proc(title: string, size: [2]int, style: Window_Style = .Windowed
 
 	hinst := cast(windows.HINSTANCE)windows.GetModuleHandleW(nil)
 	hicon := windows.LoadIconW(hinst, cast(windows.LPCWSTR)windows.MAKEINTRESOURCEW(2)) // RESOURCE_ID_FIRST_ICON
-	// if (!hIcon) {
-	//     exe_path: [MAX_PATH]u16;
-	//     GetModuleFileNameW(null, exe_path.data, MAX_PATH);
-	//     icon = ExtractIconW(hInstance, exe_path.data, 0); // 0 means first icon.
-	// }
 
 	wnd_class: windows.WNDCLASSW = {
 		lpfnWndProc   = _window_proc,
@@ -98,9 +91,6 @@ window_init :: proc(title: string, size: [2]int, style: Window_Style = .Windowed
 		assert(false, "RegisterClassW(): failed") // TODO: maybe GetLastError()
 		return false
 	}
-
-	// float doubleClickTime = GetDoubleClickTime() / static_cast<float>(Thousand(1));
-	// float caretBlinkTime  = GetCaretBlinkTime() / static_cast<float>(Thousand(1));
 
 	// TODO: check https://stackoverflow.com/q/63096226 and here: https://stackoverflow.com/q/53000291
 	// WS_EX_NOREDIRECTIONBITMAP flag here is needed to fix ugly bug with Windows 10
