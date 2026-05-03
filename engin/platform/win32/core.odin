@@ -28,3 +28,18 @@ graphical_error :: proc(title, msg: string) {
 
 	windows.MessageBoxW(nil, msg16, title16, windows.MB_OK | windows.MB_ICONERROR)
 }
+
+/*
+*
+*/
+
+foreign import user32 "system:User32.lib"
+
+@(default_calling_convention = "system")
+foreign user32 {
+	GetCaretBlinkTime :: proc() -> windows.UINT ---
+	GetDoubleClickTime :: proc() -> windows.UINT ---
+}
+
+caret_blink_time :: proc() -> f32 {return cast(f32)GetCaretBlinkTime() / 1000.}
+double_click_time :: proc() -> f32 {return cast(f32)GetDoubleClickTime() / 1000.}

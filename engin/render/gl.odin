@@ -1,147 +1,52 @@
 package render
 
-import "../platform/win32"
 import "base:runtime"
 import "core:fmt"
+import "core:sys/windows"
 import "vendor:OpenGL"
 
-/*
-*
-*/
+gl_load_up_to :: proc(major, minor: int) {
+	OpenGL.load_up_to(major, minor, windows.gl_set_proc_address)
 
-resize_default_render_target :: proc() {
-	client_size := win32.get_client_size()
-	OpenGL.Viewport(0, 0, client_size.x, client_size.y)
-}
+	when ODIN_DEBUG {
+		OpenGL.Enable(OpenGL.DEBUG_OUTPUT)
+		OpenGL.Enable(OpenGL.DEBUG_OUTPUT_SYNCHRONOUS)
 
-clear_render_target :: proc(color: [4]f32) {
-	OpenGL.ClearColor(color.r, color.g, color.b, color.a)
-	// OpenGL.Clear(OpenGL.COLOR_BUFFER_BIT | OpenGL.STENCIL_BUFFER_BIT | OpenGL.DEPTH_BUFFER_BIT)
-	OpenGL.Clear(OpenGL.COLOR_BUFFER_BIT | OpenGL.DEPTH_BUFFER_BIT)
-}
+		OpenGL.DebugMessageControl(
+			OpenGL.DONT_CARE,
+			OpenGL.DONT_CARE,
+			OpenGL.DEBUG_SEVERITY_HIGH,
+			0,
+			nil,
+			true,
+		)
+		OpenGL.DebugMessageControl(
+			OpenGL.DONT_CARE,
+			OpenGL.DONT_CARE,
+			OpenGL.DEBUG_SEVERITY_MEDIUM,
+			0,
+			nil,
+			false,
+		)
+		OpenGL.DebugMessageControl(
+			OpenGL.DONT_CARE,
+			OpenGL.DONT_CARE,
+			OpenGL.DEBUG_SEVERITY_LOW,
+			0,
+			nil,
+			false,
+		)
+		OpenGL.DebugMessageControl(
+			OpenGL.DONT_CARE,
+			OpenGL.DONT_CARE,
+			OpenGL.DEBUG_SEVERITY_NOTIFICATION,
+			0,
+			nil,
+			false,
+		)
 
-set_render_target_to_default :: proc() {
-	client_size := win32.get_client_size()
-	OpenGL.Viewport(0, 0, client_size.x, client_size.y)
-
-	OpenGL.BindFramebuffer(OpenGL.FRAMEBUFFER, 0)
-	OpenGL.DrawBuffer(OpenGL.BACK)
-}
-
-/*
-*
-*/
-
-Shader_Attrib_Layout :: struct {
-	name:   cstring,
-	size:   int,
-	type:   u32, // OpenGL.FLOAT, etc.
-	offset: uintptr,
-}
-
-Shader :: struct {
-	handle:   u32,
-	uniforms: OpenGL.Uniforms,
-}
-
-shader_init :: proc(vshader_src, fshader_src: string) -> (shader: Shader, ok: bool) {
-	handle := OpenGL.load_shaders_source(vshader_src, fshader_src) or_return
-	return Shader{handle = handle, uniforms = OpenGL.get_uniforms_from_program(handle)}, true
-}
-
-/*
-*
-*/
-
-import "core:image"
-import "core:image/bmp"
-import "core:image/jpeg"
-import "core:image/png"
-
-Texture_Format :: enum {
-	R8,
-	RG8,
-	RGB8,
-	RGBA8,
-}
-
-Texture_Filter :: enum {
-	Nearest,
-	Linear,
-}
-
-Texture :: struct {
-	handle: u32,
-	size:   [2]int,
-	format: Texture_Format,
-}
-
-texture_load_from_bytes :: proc(
-	bytes: []byte,
-	size: [2]int,
-	filter: Texture_Filter = .Linear,
-	format: Texture_Format = .RGBA8,
-) -> Texture {
-	handle: u32
-	OpenGL.GenTextures(1, &handle)
-	OpenGL.BindTexture(OpenGL.TEXTURE_2D, handle)
-
-	gl_filter := _texture_filter_to_gl(filter)
-	internal_format, gl_format, alignment := _texture_format_to_gl(format)
-
-	prev_alignment: i32
-	OpenGL.GetIntegerv(OpenGL.UNPACK_ALIGNMENT, &prev_alignment)
-	defer OpenGL.PixelStorei(OpenGL.UNPACK_ALIGNMENT, prev_alignment)
-
-	OpenGL.PixelStorei(OpenGL.UNPACK_ALIGNMENT, alignment)
-	OpenGL.TexParameteri(OpenGL.TEXTURE_2D, OpenGL.TEXTURE_MIN_FILTER, gl_filter)
-	OpenGL.TexParameteri(OpenGL.TEXTURE_2D, OpenGL.TEXTURE_MAG_FILTER, gl_filter)
-	OpenGL.TexParameteri(OpenGL.TEXTURE_2D, OpenGL.TEXTURE_WRAP_S, OpenGL.CLAMP_TO_EDGE) // OpenGL.REPEAT
-	OpenGL.TexParameteri(OpenGL.TEXTURE_2D, OpenGL.TEXTURE_WRAP_T, OpenGL.CLAMP_TO_EDGE)
-
-	OpenGL.TexImage2D(
-		OpenGL.TEXTURE_2D,
-		0,
-		internal_format,
-		cast(i32)size.x,
-		cast(i32)size.y,
-		0,
-		gl_format,
-		OpenGL.UNSIGNED_BYTE,
-		raw_data(bytes),
-	)
-
-	return {handle = handle, size = size, format = format}
-}
-
-texture_load_from_image :: proc(
-	img: ^image.Image,
-	filter: Texture_Filter = .Linear,
-) -> (
-	tex: Texture,
-	ok: bool,
-) {
-	format := _texture_format_from_channels(img.channels) or_return
-	return texture_load_from_bytes(img.pixels.buf[:], {img.width, img.height}, filter, format),
-		true
-}
-
-texture_load_from_file :: proc(
-	filepath: string,
-	filter: Texture_Filter = .Linear,
-) -> (
-	Texture,
-	bool,
-) {
-	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
-
-	img, err := image.load_from_file(filepath, allocator = context.temp_allocator)
-	if err != nil {
-		fmt.eprintfln("[ERROR]: %v", err)
-		return {}, false
+		OpenGL.DebugMessageCallback(_gl_debug_callback, nil)
 	}
-
-	return texture_load_from_image(img, filter)
 }
 
 /*
@@ -149,54 +54,73 @@ texture_load_from_file :: proc(
 */
 
 @(private = "file")
-_texture_format_to_gl :: proc(
-	format: Texture_Format,
-) -> (
-	internal_format: i32,
-	gl_format: u32,
-	alignment: i32,
+_gl_debug_callback :: proc "c" (
+	source: u32,
+	type: u32,
+	id: u32,
+	severity: u32,
+	length: i32,
+	message: cstring,
+	userParam: rawptr,
 ) {
-	switch format {
-	case .R8:
-		return OpenGL.R8, OpenGL.RED, 1
-	case .RG8:
-		return OpenGL.RG8, OpenGL.RG, 1 // 2-byte rows still need align=1 if width is odd, safest is 1
-	case .RGB8:
-		return OpenGL.RGB8, OpenGL.RGB, 1 // RGB rows are rarely 4-byte aligned
-	case .RGBA8:
-		return OpenGL.RGBA8, OpenGL.RGBA, 4
-	}
-	return OpenGL.RGBA8, OpenGL.RGBA, 4
-}
+	context = runtime.default_context()
 
-@(private = "file")
-_texture_filter_to_gl :: proc(filter: Texture_Filter) -> i32 {
-	switch filter {
-	case .Nearest:
-		return OpenGL.NEAREST
-	case .Linear:
-		return OpenGL.LINEAR
-	}
-	return OpenGL.LINEAR
-}
-
-@(private = "file")
-_texture_format_from_channels :: proc(channels: int) -> (Texture_Format, bool) {
-	switch channels {
-	case 1:
-		return .R8, true
-	case 2:
-		return .RG8, true
-	case 3:
-		return .RGB8, true
-	case 4:
-		return .RGBA8, true
+	source_str: string
+	switch source {
+	case OpenGL.DEBUG_SOURCE_API:
+		source_str = "API"
+	case OpenGL.DEBUG_SOURCE_WINDOW_SYSTEM:
+		source_str = "WINDOW_SYSTEM"
+	case OpenGL.DEBUG_SOURCE_SHADER_COMPILER:
+		return // vendor:OpenGL will handle
+	// source_str = "SHADER_COMPILER"
+	case OpenGL.DEBUG_SOURCE_THIRD_PARTY:
+		source_str = "THIRD_PARTY"
+	case OpenGL.DEBUG_SOURCE_APPLICATION:
+		source_str = "APPLICATION"
+	case OpenGL.DEBUG_SOURCE_OTHER:
+		source_str = "OTHER"
+	case:
+		source_str = "UNKNOWN"
 	}
 
-	assert(false, "unsupported channel count")
-	return .RGBA8, false
-}
+	type_str: string
+	switch type {
+	case OpenGL.DEBUG_TYPE_ERROR:
+		type_str = "ERROR"
+	case OpenGL.DEBUG_TYPE_DEPRECATED_BEHAVIOR:
+		type_str = "DEPRECATED"
+	case OpenGL.DEBUG_TYPE_UNDEFINED_BEHAVIOR:
+		type_str = "UNDEFINED_BEHAVIOR"
+	case OpenGL.DEBUG_TYPE_PORTABILITY:
+		type_str = "PORTABILITY"
+	case OpenGL.DEBUG_TYPE_PERFORMANCE:
+		type_str = "PERFORMANCE"
+	case OpenGL.DEBUG_TYPE_MARKER:
+		type_str = "MARKER"
+	case OpenGL.DEBUG_TYPE_PUSH_GROUP:
+		type_str = "PUSH_GROUP"
+	case OpenGL.DEBUG_TYPE_POP_GROUP:
+		type_str = "POP_GROUP"
+	case OpenGL.DEBUG_TYPE_OTHER:
+		type_str = "OTHER"
+	case:
+		type_str = "UNKNOWN"
+	}
 
-/*
-*
-*/
+	severity_str: string
+	switch severity {
+	case OpenGL.DEBUG_SEVERITY_HIGH:
+		severity_str = "HIGH"
+	case OpenGL.DEBUG_SEVERITY_MEDIUM:
+		severity_str = "MEDIUM"
+	case OpenGL.DEBUG_SEVERITY_LOW:
+		severity_str = "LOW"
+	case OpenGL.DEBUG_SEVERITY_NOTIFICATION:
+		severity_str = "NOTIFICATION"
+	case:
+		severity_str = "UNKNOWN"
+	}
+
+	fmt.eprintfln("[GL %s] [%s] [%s] (%d): %s", severity_str, source_str, type_str, id, message)
+}

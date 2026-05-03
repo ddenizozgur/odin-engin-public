@@ -7,6 +7,10 @@ import "core:image"
 import "core:image/png"
 import "core:os"
 
+/*
+*
+*/
+
 MSDF_Atlas :: struct {
 	// dont change var names
 	type:                string,
@@ -53,7 +57,7 @@ MSDF_File :: struct {
 	kerning: []MSDF_KerningPair,
 }
 
-font_load_from_image :: proc(
+msdf_font_load_from_image :: proc(
 	json_path: string,
 	img: ^image.Image,
 	allocator := context.allocator,
@@ -86,9 +90,9 @@ font_load_from_image :: proc(
 		atlas_h := cast(f32)msdf_data.atlas.height
 		y_flip := msdf_data.atlas.yOrigin == "top"
 
-		font.texture = texture_load_from_image(img) or_return
-		font.texture.size.x = cast(int)msdf_data.atlas.width
-		font.texture.size.y = cast(int)msdf_data.atlas.height
+		font.tex2d = tex2d_load_from_image(img) or_return
+		font.tex2d.size.x = cast(int)msdf_data.atlas.width
+		font.tex2d.size.y = cast(int)msdf_data.atlas.height
 		font.distance_range = msdf_data.atlas.distanceRange
 		font.line_height = msdf_data.metrics.lineHeight
 		font.ascender = msdf_data.metrics.ascender
@@ -132,7 +136,7 @@ font_load_from_image :: proc(
 	return inner(json_path, img, context.temp_allocator, allocator)
 }
 
-font_load_from_file :: proc(
+msdf_font_load_from_file :: proc(
 	json_path: string,
 	img_path: string,
 	allocator := context.allocator,
@@ -154,7 +158,7 @@ font_load_from_file :: proc(
 			fmt.eprintfln("[ERROR] image.load_from_file(): %v", img_err)
 			return {}, false
 		}
-		return font_load_from_image(json_path, img, allocator = final_alloc)
+		return msdf_font_load_from_image(json_path, img, allocator = final_alloc)
 	}
 
 	if allocator == context.temp_allocator {

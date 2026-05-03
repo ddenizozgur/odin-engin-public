@@ -1,4 +1,3 @@
-#+build windows
 package main
 
 import "core:fmt"
@@ -6,7 +5,6 @@ import "core:math"
 import "core:math/linalg"
 import "core:sys/windows"
 import "core:time"
-import "vendor:OpenGL"
 
 import "engin/platform"
 import "engin/platform/win32"
@@ -16,25 +14,22 @@ import "engin/render"
 *
 */
 
+tex2d: render.Tex2D
 font: render.Font
 
-to_init :: proc() -> bool {
-	render.imm_init() or_return
-
-	font = render.font_load_from_file(
-		"resource/fonts/size32pxrange8/VarelaRound-Regular.json",
-		"resource/fonts/size32pxrange8/VarelaRound-Regular.png",
-	) or_return
-
-	return true
-}
-
-to_update :: proc(delta_time: f32) {
+to_update :: proc(dt: f32) -> bool {
 	@(static) initted := false
 	if (!initted) {
-		defer initted = true
-		to_init()
+		font = render.msdf_font_load_from_file(
+			"resource/fonts/size32pxrange8/VarelaRound-Regular.json",
+			"resource/fonts/size32pxrange8/VarelaRound-Regular.png",
+		) or_return
+
+		initted = true
 	}
+
+	@(static) et: f32
+	defer et += dt
 
 	client_size := linalg.to_f32(win32.get_client_size())
 	mouse_pos := linalg.to_f32(win32.get_mouse_pos())
@@ -42,34 +37,37 @@ to_update :: proc(delta_time: f32) {
 	{
 		render.imm_begin()
 		defer {
-			draw_fps(font, {0, 0}, 20, delta_time)
+			draw_fps(font, {client_size.x, 0}, 20, dt, .TopRight)
 			render.imm_end()
 		}
 
-		render.clear_render_target({0.15, 0.1, 0.15, 1})
+		aurora_bg(et)
+		torture_test_liquid_neon(font, et)
 
-		torture_test0(font, delta_time)
 	}
+
+	return true
 }
 
 main :: proc() {
 	win32.set_console_utf8()
 
-	win32.window_init("Odin-Engin-Public", {1280, 800}, .Windowed)
+	win32.window_init("Kralsın", {1280, 800}, .Windowed)
 	defer win32.window_free()
 
 	win32.wgl_init()
 	windows.wglSwapIntervalEXT(0)
 
-	OpenGL.load_up_to(4, 3, windows.gl_set_proc_address)
+	render.gl_load_up_to(4, 3)
 
 	prev_time := time.now()
 
 	frame_loop: for {
 		curr_time := time.now()
 		duration := time.diff(prev_time, curr_time)
-		delta_time := cast(f32)time.duration_seconds(duration)
+		dt := cast(f32)time.duration_seconds(duration)
 		prev_time = curr_time
+		// print_fps(delta_time)
 
 		win32.poll_events_this_frame()
 		for event in platform.events_this_frame {
@@ -77,96 +75,160 @@ main :: proc() {
 			case platform.Event_Window_Close:
 				break frame_loop
 			case platform.Event_Mouse_Button:
-				if data.state == .Press do fmt.printfln("pressed")
-				if data.state == .Release do fmt.printfln("released")
+				if data.state == .Pressed do mouse_pressed = true
+				if data.state == .Released do mouse_pressed = false
 			}
 		}
 
-		to_update(delta_time)
+		to_update(dt)
 	}
 }
+
+mouse_pressed := false
 
 @(export) //link_name="NvOptimusEnablement"
 NvOptimusEnablement: u32 = 1
 @(export) //link_name="AmdPowerXpressRequestHighPerformance"
 AmdPowerXpressRequestHighPerformance: i32 = 1
 
-draw_fps :: proc(font: render.Font, pos: [2]f32, font_size: f32, delta_time: f32) {
-	@(static) elapsed_time: f32
+draw_fps :: proc(
+	font: render.Font,
+	pos: [2]f32,
+	font_size: f32,
+	dt: f32,
+	align_kind: render.Align_Kind = .TopLeft,
+) {
+	@(static) et: f32
 	@(static) fps: u32
 
 	@(static) fps_buf: [32]u8
 	@(static) fps_str: string
 
-	for elapsed_time >= 1. {
+	defer {
+		et += dt
+		fps += 1
+	}
+
+	for et >= 1. {
 		fps_str = fmt.bprintf(fps_buf[:], "FPS: %v", fps)
 
-		elapsed_time -= 1.
+		et -= 1.
 		fps = 0
 	}
 
-	render.imm_push_text(font, fps_str, pos, font_size, {1, 1, 0, 1})
-
-	elapsed_time += delta_time
-	fps += 1
+	bounds := render.text_bbox(font, fps_str, font_size)
+	real_pos := render.pos_from_align_kind(pos, bounds, align_kind)
+	render.imm_push_text(font, fps_str, real_pos, font_size, render.YELLOW)
 }
 
-torture_test0 :: proc(font: render.Font, delta_time: f32) {
-	@(static) time_elapsed: f32
-	time_elapsed += delta_time
+/*
+*
+*/
 
+aurora_bg :: proc(et: f32) {
+	client := linalg.to_f32(win32.get_client_size())
+
+	s1 := math.sin_f32(et * 0.15)
+	s2 := math.cos_f32(et * 0.22)
+	s3 := math.sin_f32(et * 0.18 + 1.0)
+	s4 := math.cos_f32(et * 0.12 + 2.0)
+
+	tl := [4]f32{0.10 + 0.05 * s1, 0.02, 0.25 + 0.1 * s2, 1.0}
+	tr := [4]f32{0.30 + 0.10 * s3, 0.05, 0.15, 1.0}
+	bl := [4]f32{0.02, 0.15 + 0.05 * s4, 0.35 + 0.1 * s1, 1.0}
+	br := [4]f32{0.15, 0.05, 0.25 + 0.05 * s2, 1.0}
+
+	render.imm_push_rect_grad(
+		{0, 0},
+		client,
+		render.vec4f32_to_rgba32(tl),
+		render.vec4f32_to_rgba32(tr),
+		render.vec4f32_to_rgba32(bl),
+		render.vec4f32_to_rgba32(br),
+	)
+}
+
+torture_test_liquid_neon :: proc(font: render.Font, et: f32) {
 	client_size := linalg.to_f32(win32.get_client_size())
-	mouse_pos := linalg.to_f32(win32.get_mouse_pos())
 
-	center := client_size * 0.5
+	cols := 40
+	rows := 25
+	cell_w := client_size.x / cast(f32)cols
+	cell_h := client_size.y / cast(f32)rows
 
-	// Draws a massive grid of pulsing, rounded rectangles.
-	grid_size := client_size / 30
-	spacing :: 30.0
-	rect_size :: 20.0
+	color_at :: proc(nx, ny, t: f32) -> [4]f32 {
+		v1 := math.sin(nx * 10.0 + t * 1.5)
+		v2 := math.sin(ny * 8.0 - t * 1.2)
+		v3 := math.sin((nx + ny) * 12.0 + t)
 
-	start := center - (grid_size * spacing) * 0.5
+		dx := nx - 0.5
+		dy := ny - 0.5
+		dist := math.sqrt(dx * dx + dy * dy)
+		v4 := math.cos(dist * 20.0 - t * 3.0)
 
-	for y in 0 ..< grid_size.y {
-		for x in 0 ..< grid_size.x {
+		sum := (v1 + v2 + v3 + v4) * 0.25
+
+		r := 0.6 + 0.4 * math.sin(sum * math.PI + 0.0)
+		g := 0.3 + 0.3 * math.sin(sum * math.PI + 2.0)
+		b := 0.8 + 0.2 * math.sin(sum * math.PI + 4.0)
+
+		return {r, g, b, 1.0}
+	}
+
+	for y in 0 ..< rows {
+		for x in 0 ..< cols {
 			xf := cast(f32)x
 			yf := cast(f32)y
 
-			wave := math.sin(time_elapsed * 2.0 + (xf * 0.2) + (yf * 0.2))
+			nx0 := xf / cast(f32)cols
+			ny0 := yf / cast(f32)rows
+			nx1 := (xf + 1.0) / cast(f32)cols
+			ny1 := (yf + 1.0) / cast(f32)rows
 
-			pos := [2]f32 {
-				start.x + xf * spacing + (wave * 10.0),
-				start.y + yf * spacing + (math.cos(time_elapsed + xf * 0.3) * 10.0),
-			}
+			c0 := color_at(nx0, ny0, et)
+			c1 := color_at(nx1, ny0, et)
+			c2 := color_at(nx0, ny1, et)
+			c3 := color_at(nx1, ny1, et)
 
-			size := [2]f32{rect_size + (wave * 5.0), rect_size + (wave * 5.0)}
-			radius := (rect_size * 0.5) * (wave * 0.5 + 0.5)
+			base_pos := [2]f32{xf * cell_w, yf * cell_h}
 
-			color := [4]f32 {
-				0.5 + 0.5 * math.sin(time_elapsed + xf * 0.1),
-				0.5 + 0.5 * math.cos(time_elapsed + yf * 0.1),
-				0.8,
-				0.4, // forces heavy blending work on the GPU
-			}
+			pulse := math.sin(et * 3.0 + c0.r * 5.0)
+			scale := 0.60 + (0.40 * pulse)
 
-			render.imm_push_rect(pos, size, color, radius)
+			size := [2]f32{cell_w * scale, cell_h * scale}
+
+			offset := [2]f32{cell_w * (1.0 - scale) * 0.5, cell_h * (1.0 - scale) * 0.5}
+
+			roundness := (cell_w * 0.5) * scale
+
+			render.imm_push_rect_grad(
+				base_pos + offset,
+				size,
+				render.vec4f32_to_rgba32(c0),
+				render.vec4f32_to_rgba32(c1),
+				render.vec4f32_to_rgba32(c2),
+				render.vec4f32_to_rgba32(c3),
+				roundness,
+			)
 		}
 	}
 
-	// Pushes floating text that scales up and down
-	str_count :: 30
-	for i in 0 ..< str_count {
-		f_i := cast(f32)i
-		angle := time_elapsed * 0.5 + (f_i * 0.5)
-		dist := 150.0 + math.sin(time_elapsed * 1.5 + f_i) * 100.0
+	panel_size := [2]f32{200, 40}
+	panel_pos := (client_size - panel_size) / 2
 
-		txt_x := center.x + math.cos(angle) * dist
-		txt_y := center.y + math.sin(angle) * dist
+	bg_dark := [4]f32{0.05, 0.05, 0.08, 0.85}
+	render.imm_push_rect(
+		panel_pos,
+		panel_size,
+		{render.BLACK.x, render.BLACK.y, render.BLACK.z, 0x55},
+		8.0,
+	)
 
-		txt_size := 36.0 + math.sin(time_elapsed * 3.0 + f_i) * 28.0
-
-		color := [4]f32{1.0, f_i / cast(f32)str_count, 0.2, 1.0}
-
-		render.imm_push_text(font, "Bu benden sana gelsin", {txt_x, txt_y}, txt_size, color)
-	}
+	text := "Benden Sana Gelsin"
+	text_pos := render.pos_from_align_kind(
+		client_size / 2,
+		render.text_bbox(font, text, 20),
+		.Center,
+	)
+	render.imm_push_text(font, text, text_pos, 20.0, render.WHITE)
 }

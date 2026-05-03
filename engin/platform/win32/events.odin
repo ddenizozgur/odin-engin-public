@@ -30,7 +30,7 @@ poll_events_this_frame :: proc() {
 // const bool swapped = (TRUE == GetSystemMetrics(SM_SWAPBUTTON));
 // TODO: check for swapped mouse buttons???
 @(private = "file")
-_MOUSE_SCROLL_NORMVAL :: cast(f32)120
+_MOUSE_SCROLL_NORMVAL :: f32(120)
 
 @(private)
 _window_proc :: proc "system" (
@@ -60,6 +60,7 @@ _window_proc :: proc "system" (
 		append(&platform.events_this_frame, platform.Event_Window_Focus{})
 	case windows.WM_KILLFOCUS:
 		append(&platform.events_this_frame, platform.Event_Window_UnFocus{})
+		// TODO: ??? windows.ReleaseCapture()
 
 	case windows.WM_INPUT: // TODO: rawinput
 	case windows.WM_PAINT:
@@ -73,37 +74,37 @@ _window_proc :: proc "system" (
 		windows.ReleaseCapture()
 		append(
 			&platform.events_this_frame,
-			platform.Event_Mouse_Button{state = .Release, button = .Left},
+			platform.Event_Mouse_Button{state = .Released, button = .Left},
 		)
 	case windows.WM_LBUTTONDOWN:
 		windows.SetCapture(hwnd)
 		append(
 			&platform.events_this_frame,
-			platform.Event_Mouse_Button{state = .Press, button = .Left},
+			platform.Event_Mouse_Button{state = .Pressed, button = .Left},
 		)
 	case windows.WM_MBUTTONUP:
 		windows.ReleaseCapture()
 		append(
 			&platform.events_this_frame,
-			platform.Event_Mouse_Button{state = .Release, button = .Middle},
+			platform.Event_Mouse_Button{state = .Released, button = .Middle},
 		)
 	case windows.WM_MBUTTONDOWN:
 		windows.SetCapture(hwnd)
 		append(
 			&platform.events_this_frame,
-			platform.Event_Mouse_Button{state = .Press, button = .Middle},
+			platform.Event_Mouse_Button{state = .Pressed, button = .Middle},
 		)
 	case windows.WM_RBUTTONUP:
 		windows.ReleaseCapture()
 		append(
 			&platform.events_this_frame,
-			platform.Event_Mouse_Button{state = .Release, button = .Right},
+			platform.Event_Mouse_Button{state = .Released, button = .Right},
 		)
 	case windows.WM_RBUTTONDOWN:
 		windows.SetCapture(hwnd)
 		append(
 			&platform.events_this_frame,
-			platform.Event_Mouse_Button{state = .Press, button = .Right},
+			platform.Event_Mouse_Button{state = .Pressed, button = .Right},
 		)
 	case windows.WM_XBUTTONUP:
 		windows.ReleaseCapture()
@@ -114,7 +115,7 @@ _window_proc :: proc "system" (
 		append(
 			&platform.events_this_frame,
 			platform.Event_Mouse_Button {
-				state = .Release,
+				state = .Released,
 				button = windows.HIWORD(wparam) == 1 ? .XButton1 : .XButton2,
 			},
 		)
@@ -124,7 +125,7 @@ _window_proc :: proc "system" (
 		append(
 			&platform.events_this_frame,
 			platform.Event_Mouse_Button {
-				state = .Press,
+				state = .Pressed,
 				button = windows.HIWORD(wparam) == 1 ? .XButton1 : .XButton2,
 			},
 		)
@@ -157,7 +158,7 @@ _window_proc :: proc "system" (
 			platform.Event_Key {
 				code = _keycode_from_vkey(cast(u32)wparam),
 				mode = _get_keymode(),
-				state = is_down ? .Press : .Release,
+				state = is_down ? .Pressed : .Released,
 				is_repeat = was_down && is_down,
 				repeat_count = lparam & 0xffff,
 			},

@@ -2,6 +2,7 @@
 package win32
 
 import "core:sys/windows"
+import "vendor:OpenGL"
 
 wgl_init :: proc() -> bool {
 	if _hwnd == nil {
