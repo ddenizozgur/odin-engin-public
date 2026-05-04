@@ -262,9 +262,9 @@ _current_tex2d: Tex2D
 _batch_has_tex2d: bool
 
 @(private = "file")
-_uber_vshader_src := cast(string)#load("../../shaders/imm_uber_vshader.glsl")
+_uber_vshader_src := cast(string)#load("shader_src/imm_uber_vshader.glsl")
 @(private = "file")
-_uber_fshader_src := cast(string)#load("../../shaders/imm_uber_fshader.glsl")
+_uber_fshader_src := cast(string)#load("shader_src/imm_uber_fshader.glsl")
 
 @(private = "file")
 _uber_shader_attrib_layout: []Shader_Attrib_Layout = {
