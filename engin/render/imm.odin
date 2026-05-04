@@ -262,6 +262,25 @@ _current_tex2d: Tex2D
 _batch_has_tex2d: bool
 
 @(private = "file")
+_uber_vshader_src := cast(string)#load("../../shaders/imm_uber_vshader.glsl")
+@(private = "file")
+_uber_fshader_src := cast(string)#load("../../shaders/imm_uber_fshader.glsl")
+
+@(private = "file")
+_uber_shader_attrib_layout: []Shader_Attrib_Layout = {
+	{"a_src", 4, OpenGL.FLOAT, offset_of(Imm_Per_Data, src), false},
+	{"a_dst", 4, OpenGL.FLOAT, offset_of(Imm_Per_Data, dst), false},
+	{"a_color_tl", 4, OpenGL.UNSIGNED_BYTE, offset_of(Imm_Per_Data, color_tl), true},
+	{"a_color_tr", 4, OpenGL.UNSIGNED_BYTE, offset_of(Imm_Per_Data, color_tr), true},
+	{"a_color_bl", 4, OpenGL.UNSIGNED_BYTE, offset_of(Imm_Per_Data, color_bl), true},
+	{"a_color_br", 4, OpenGL.UNSIGNED_BYTE, offset_of(Imm_Per_Data, color_br), true},
+	{"a_roundness", 1, OpenGL.FLOAT, offset_of(Imm_Per_Data, roundness), false},
+	// {"a_border_size", 1, OpenGL.FLOAT, offset_of(Imm_Per_Data, border_size), false},
+	// {"a_border_color", 4, OpenGL.UNSIGNED_BYTE, offset_of(Imm_Per_Data, border_color), true},
+	{"a_shader_kind", 1, OpenGL.INT, offset_of(Imm_Per_Data, shader_kind), false},
+}
+
+@(private = "file")
 _set_current_tex2d :: proc(handle: u32) {
 	if _batch_has_tex2d && _current_tex2d.handle != handle {
 		_flush()
@@ -340,190 +359,6 @@ _flush :: proc() -> bool {
 	OpenGL.DrawArraysInstanced(OpenGL.TRIANGLE_STRIP, 0, 4, cast(i32)len(_data_list))
 
 	return true
-}
-
-/*
-*
-*/
-
-@(private = "file")
-_uber_vshader_src := `
-#version 330 core
-
-in vec4  a_dst;
-in vec4  a_src;
-in vec4  a_color_tl;
-in vec4  a_color_tr;
-in vec4  a_color_bl;
-in vec4  a_color_br;
-in float a_roundness;
-// in float a_border_size;
-// in vec4  a_border_color;
-in int   a_shader_kind;
-
-out vec4  v_color;
-out vec2  v_sdf_pos;
-out vec2  v_half_size;
-out float v_roundness;
-// out float v_border_size;
-// out vec4  v_border_color;
-out vec2  v_uv;
-flat out int v_shader_kind;
-
-uniform mat4 u_proj_ortho;
-
-void main() {
-  vec2 verts[4] = vec2[](
-    vec2(-1.0, -1.0),
-    vec2( 1.0, -1.0),
-    vec2(-1.0,  1.0),
-    vec2( 1.0,  1.0)
-  );
-
-  vec4 colors[4] = vec4[](
-  	a_color_tl,
-   	a_color_tr,
-    a_color_bl,
-    a_color_br
-  );
-
-  vec4 local_color = colors[gl_VertexID];
-  vec2 local_vert = verts[gl_VertexID];
-  vec2 local_uv = local_vert * 0.5 + 0.5;
-  vec2 final_uv = mix(a_src.xy, a_src.zw, local_uv);
-
-  vec2 half_size = (a_dst.zw - a_dst.xy) * 0.5;
-  vec2 center = a_dst.xy + half_size;
-  vec2 pos = center + (local_vert * half_size);
-
-  {
-  	gl_Position = u_proj_ortho * vec4(pos, 0.0, 1.0);
-
-  	v_color        = local_color;
-  	v_sdf_pos      = local_vert * half_size;
-  	v_half_size    = half_size;
-  	v_roundness    = a_roundness;
-   	// v_border_size  = a_border_size;
-    // v_border_color = a_border_color;
-  	v_uv           = final_uv;
-   	v_shader_kind  = a_shader_kind;
-  }
-}`
-
-@(private = "file")
-_uber_fshader_src := `
-#version 330 core
-
-in vec4  v_color;
-in vec2  v_sdf_pos;
-in vec2  v_half_size;
-in float v_roundness;
-// in float v_border_size;
-// in vec4  v_border_color;
-in vec2  v_uv;
-flat in int v_shader_kind;
-
-uniform sampler2D u_texture;
-
-out vec4 frag_color;
-
-float sdf_rounded_box(vec2 p, vec2 half_size, float r) {
-  vec2 q = abs(p) - half_size + vec2(r);
-  return min(max(q.x, q.y), 0.0) + length(max(q, 0.0)) - r;
-}
-
-float msdf_median(float r, float g, float b) {
-  return max(min(r, g), min(max(r, g), b));
-}
-
-float gradient_noise(vec2 n) {
-  float f = 0.06711056 * n.x + 0.00583715 * n.y;
-  return fract(52.9829189 * fract(f));
-}
-
-#define SHADER_KIND_RECT	0
-#define SHADER_KIND_IMAGE	1
-#define SHADER_KIND_TEXT	2
-
-#define TEXT_THICKNESS	0.6
-#define MSDF_PXRANGE    8.0
-
-void main() {
-  float corner_alpha = 1.0;
-  // float border_mix = 0.0;
-  vec4 tex_color = vec4(1.0);
-
-  if (v_shader_kind != SHADER_KIND_RECT) {
-    tex_color = texture(u_texture, v_uv);
-  }
-
-  switch (v_shader_kind) {
-  case SHADER_KIND_IMAGE:    // fallthrough
-  case SHADER_KIND_RECT:
-  	// if (v_roundness > 0.0 || v_border_size > 0.0) {
-  	if (v_roundness > 0.0) {
-      float safe_radius = min(v_roundness, min(v_half_size.x, v_half_size.y));
-      float dist = sdf_rounded_box(v_sdf_pos, v_half_size, safe_radius);
-
-      float aa = length(vec2(dFdx(dist), dFdy(dist)));
-      float feather = aa * 0.5;
-      corner_alpha = 1.0 - smoothstep(-feather, feather, dist);
-
-      // if (v_border_size > 0.0) {
-      //   vec2 inner_half_size = max(v_half_size - v_border_size, vec2(0.0));
-      //   float inner_radius = max(safe_radius - v_border_size, 0.0);
-      //   float inner_dist = sdf_rounded_box(v_sdf_pos, inner_half_size, inner_radius);
-      //   border_mix = smoothstep(-feather, feather, inner_dist);
-      // }
-    }
-  break;
-  case SHADER_KIND_TEXT: {
-    float sd = msdf_median(tex_color.r, tex_color.g, tex_color.b) - 0.5;
-
-    vec2 msdf_tex_size = vec2(textureSize(u_texture, 0));
-    vec2 unit_range = vec2(MSDF_PXRANGE) / msdf_tex_size;
-
-    vec2 screen_tex_size = vec2(1.0) / fwidth(v_uv);
-    float screen_px_range = max(0.5 * dot(unit_range, screen_tex_size), 1.0);
-
-    float screen_px_distance = screen_px_range * sd;
-    float opacity = clamp(screen_px_distance + TEXT_THICKNESS, 0.0, 1.0);
-
-    tex_color = vec4(1.0, 1.0, 1.0, opacity);
-  } break;
-  default:
-    break;
-  }
-
-  frag_color = tex_color * v_color;
-
-  // if (v_shader_kind != SHADER_KIND_TEXT && v_border_size > 0.0) {
-  // 	float final_mix = border_mix * v_border_color.a;
-  //   frag_color = mix(frag_color, v_border_color, final_mix);
-  // }
-
-  // cut out the outside corners
-  frag_color.a *= corner_alpha;
-
-  // for bending
-  float noise = gradient_noise(gl_FragCoord.xy);
-  noise = (noise - 0.5) / 255.0;
-  frag_color.rgb += noise;
-}`
-
-
-@(private = "file")
-_uber_shader_attrib_layout: []Shader_Attrib_Layout = {
-	{"a_src", 4, OpenGL.FLOAT, offset_of(Imm_Per_Data, src), false},
-	{"a_dst", 4, OpenGL.FLOAT, offset_of(Imm_Per_Data, dst), false},
-	{"a_color_tl", 4, OpenGL.UNSIGNED_BYTE, offset_of(Imm_Per_Data, color_tl), true},
-	{"a_color_tr", 4, OpenGL.UNSIGNED_BYTE, offset_of(Imm_Per_Data, color_tr), true},
-	{"a_color_bl", 4, OpenGL.UNSIGNED_BYTE, offset_of(Imm_Per_Data, color_bl), true},
-	{"a_color_br", 4, OpenGL.UNSIGNED_BYTE, offset_of(Imm_Per_Data, color_br), true},
-	{"a_roundness", 1, OpenGL.FLOAT, offset_of(Imm_Per_Data, roundness), false},
-	// {"a_border_size", 1, OpenGL.FLOAT, offset_of(Imm_Per_Data, border_size), false},
-	// {"a_border_color", 4, OpenGL.UNSIGNED_BYTE, offset_of(Imm_Per_Data, border_color), true},
-	{"a_shader_kind", 1, OpenGL.INT, offset_of(Imm_Per_Data, shader_kind), false},
 }
 
 @(private = "file")
