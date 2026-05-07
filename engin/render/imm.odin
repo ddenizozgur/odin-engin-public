@@ -266,50 +266,6 @@ text_bbox :: proc(font: Font, text: string, font_size: f32) -> [2]f32 {
 *
 */
 
-Align_Kind :: enum {
-	TopLeft,
-	TopCenter,
-	TopRight,
-	CenterLeft,
-	Center,
-	CenterRight,
-	BottomLeft,
-	BottomCenter,
-	BottomRight,
-}
-
-pos_from_align_kind :: proc(pos, size: [2]f32, align: Align_Kind) -> [2]f32 {
-	real_pos := pos
-
-	switch align {
-	case .TopLeft:
-	case .TopCenter:
-		real_pos.x -= size.x * 0.5
-	case .TopRight:
-		real_pos.x -= size.x
-	case .CenterLeft:
-		real_pos.y -= size.y * 0.5
-	case .Center:
-		real_pos -= size * 0.5
-	case .CenterRight:
-		real_pos.x -= size.x
-		real_pos.y -= size.y * 0.5
-	case .BottomLeft:
-		real_pos.y -= size.y
-	case .BottomCenter:
-		real_pos.x -= size.x * 0.5
-		real_pos.y -= size.y
-	case .BottomRight:
-		real_pos -= size
-	}
-
-	return real_pos
-}
-
-/*
-*
-*/
-
 @(private = "file")
 _vao, _vbo: u32
 @(private = "file")

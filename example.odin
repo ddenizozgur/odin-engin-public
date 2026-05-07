@@ -47,11 +47,11 @@ to_update :: proc(dt: f32) -> bool {
 			render.imm_end_frame()
 		}
 
-		render.clear_target(render.NAYSAYER_BG)
+		aurora_bg(et)
+		// render.clear_target(render.NAYSAYER_BG)
 
-		torture_test_liquid_neon(font, et)
-
-		// draw_some_text(font, {20, 0}, render.RAYWHITE)
+		// torture_test_liquid_neon(font, et)
+		draw_some_text(font, {0, 0}, math.sin_f32(et) * 0.5 + 1., render.RAYWHITE)
 	}
 
 	return true
@@ -133,11 +133,11 @@ draw_fps :: proc(
 *
 */
 
-draw_some_text :: proc(font: render.Font, pos: [2]f32, color: render.RGBA32) {
+draw_some_text :: proc(font: render.Font, pos: [2]f32, scale: f32, color: render.RGBA32) {
 	y := pos.y
 
 	for i in 0 ..= 32 {
-		font_size := (cast(f32)i + 4) * 1
+		font_size := (cast(f32)i + 4) * scale
 		font_scale := font_size / font.metrics.emSize
 		line_h := font.metrics.lineHeight * font_scale
 		defer y += line_h
@@ -147,8 +147,9 @@ draw_some_text :: proc(font: render.Font, pos: [2]f32, color: render.RGBA32) {
 
 			render.imm_push_text(
 				font,
-				fmt.tprintf("Gardaşlarımdan birkaçısın, size %v", font_size),
+				// fmt.tprintf("Gardaşlarımdan birkaçısın, size %v", font_size),
 				// fmt.tprintf("The quick brown fox jumps over the lazy dog, size %v", font_size),
+				"The quick brown fox jumps over the lazy dog",
 				{pos.x, y},
 				font_size,
 				color,
@@ -246,22 +247,22 @@ torture_test_liquid_neon :: proc(font: render.Font, et: f32) {
 		}
 	}
 
-	panel_size := [2]f32{200, 40}
-	panel_pos := (client_size - panel_size) / 2
+	text := "Benden Sana Gelsin"
+	text_bbox := render.text_bbox(font, text, 20)
+
+	box_pos := render.pos_from_align_kind(
+		client_size,
+		render.text_bbox(font, text, 20),
+		.BottomRight,
+	)
 
 	bg_dark := [4]f32{0.05, 0.05, 0.08, 0.85}
 	render.imm_push_rect(
-		panel_pos,
-		panel_size,
+		box_pos,
+		text_bbox,
 		{render.BLACK.x, render.BLACK.y, render.BLACK.z, 0x55},
 		8.0,
 	)
 
-	text := "Benden Sana Gelsin"
-	text_pos := render.pos_from_align_kind(
-		client_size / 2,
-		render.text_bbox(font, text, 20),
-		.Center,
-	)
-	render.imm_push_text(font, "Benden Sana Gelsin", text_pos, 20.0, render.WHITE)
+	render.imm_push_text(font, "Benden Sana Gelsin", box_pos, 20.0, render.WHITE)
 }

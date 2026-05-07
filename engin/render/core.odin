@@ -1,11 +1,37 @@
 package render
 
+/*
+import "base:runtime"
+import "core:prof/spall"
+import "core:sync"
+
+spall_ctx: spall.Context
+@(thread_local)
+spall_buff: spall.Buffer
+
+@(init)
+spall_init :: proc "contextless" () {
+	context = runtime.default_context()
+
+	spall_ctx = spall.context_create("trace-test.spall")
+
+	backing_buff := make([]u8, spall.BUFFER_DEFAULT_SIZE, allocator = context.allocator)
+	spall_buff = spall.buffer_create(backing_buff, u32(sync.current_thread_id()))
+}
+
+@(instrumentation_enter)
+spall_enter :: proc "contextless" (proc_address, call_site_return_address: rawptr, loc: runtime.Source_Code_Location) {
+	spall._buffer_begin(&spall_ctx, &spall_buff, "", "", loc)
+}
+
+@(instrumentation_exit)
+spall_exit :: proc "contextless" (proc_address, call_site_return_address: rawptr, loc: runtime.Source_Code_Location) {
+	spall._buffer_end(&spall_ctx, &spall_buff)
+}
+*/
+
 import "core:math"
 import "core:math/linalg"
-
-/*
-*
-*/
 
 RGBA32 :: distinct [4]byte
 
@@ -54,4 +80,48 @@ vec4f32_to_rgba32 :: #force_inline proc(v: [4]f32) -> RGBA32 {
 	}
 
 	return bytes
+}
+
+/*
+*
+*/
+
+Align_Kind :: enum {
+	TopLeft,
+	TopCenter,
+	TopRight,
+	CenterLeft,
+	Center,
+	CenterRight,
+	BottomLeft,
+	BottomCenter,
+	BottomRight,
+}
+
+pos_from_align_kind :: proc(pos, size: [2]f32, align: Align_Kind) -> [2]f32 {
+	real_pos := pos
+
+	switch align {
+	case .TopLeft:
+	case .TopCenter:
+		real_pos.x -= size.x * 0.5
+	case .TopRight:
+		real_pos.x -= size.x
+	case .CenterLeft:
+		real_pos.y -= size.y * 0.5
+	case .Center:
+		real_pos -= size * 0.5
+	case .CenterRight:
+		real_pos.x -= size.x
+		real_pos.y -= size.y * 0.5
+	case .BottomLeft:
+		real_pos.y -= size.y
+	case .BottomCenter:
+		real_pos.x -= size.x * 0.5
+		real_pos.y -= size.y
+	case .BottomRight:
+		real_pos -= size
+	}
+
+	return real_pos
 }
