@@ -40,15 +40,14 @@ to_update :: proc(dt: f32) -> bool {
 
 	{
 		render.IMM_FRAME_SCOPED()
-		render.IMM_FONT_SCOPED(&font)
 
 		// aurora_bg(et)
 		render.clear_target(render.NAYSAYER_BG)
 
 		// torture_test_liquid_neon(font, et)
-		draw_some_text({0, 0}, math.sin_f32(et) * 0.5 + 1., render.RAYWHITE)
+		draw_some_text(font, {0, 0}, math.sin_f32(et) * 0.5 + 1., render.RAYWHITE)
 
-		draw_fps({client_size.x, 0}, 20, dt, .TopRight)
+		draw_fps(font, {client_size.x, 0}, 20, dt, .TopRight)
 	}
 
 	return true
@@ -96,7 +95,13 @@ NvOptimusEnablement: u32 = 1
 @(export) //link_name="AmdPowerXpressRequestHighPerformance"
 AmdPowerXpressRequestHighPerformance: i32 = 1
 
-draw_fps :: proc(pos: [2]f32, font_size: f32, dt: f32, align_kind := render.Align_Kind.TopLeft) {
+draw_fps :: proc(
+	font: render.Font,
+	pos: [2]f32,
+	font_size: f32,
+	dt: f32,
+	align_kind := render.Align_Kind.TopLeft,
+) {
 	@(static) et: f32
 	@(static) fps: u32
 
@@ -115,16 +120,16 @@ draw_fps :: proc(pos: [2]f32, font_size: f32, dt: f32, align_kind := render.Alig
 		fps = 0
 	}
 
-	bounds := render.text_bbox(fps_str, font_size)
+	bounds := render.text_bbox(font, fps_str, font_size)
 	real_pos := render.pos_from_align_kind(pos, bounds, align_kind)
-	render.imm_push_text(fps_str, real_pos, font_size, render.YELLOW)
+	render.imm_push_text(font, fps_str, real_pos, font_size, render.YELLOW)
 }
 
 /*
 *
 */
 
-draw_some_text :: proc(pos: [2]f32, scale: f32, color: render.RGBA32) {
+draw_some_text :: proc(font: render.Font, pos: [2]f32, scale: f32, color: render.RGBA32) {
 	y := pos.y
 
 	for i in 0 ..= 32 {
@@ -137,6 +142,7 @@ draw_some_text :: proc(pos: [2]f32, scale: f32, color: render.RGBA32) {
 			runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 
 			render.imm_push_text(
+				font,
 				"The quick brown fox jumps over the lazy dog",
 				{pos.x, y},
 				font_size,
@@ -169,7 +175,7 @@ aurora_bg :: proc(et: f32) {
 	)
 }
 
-torture_test_liquid_neon :: proc(et: f32) {
+torture_test_liquid_neon :: proc(font: render.Font, et: f32) {
 	client_size := linalg.to_f32(win32.get_client_size())
 
 	cols := 40
@@ -234,10 +240,15 @@ torture_test_liquid_neon :: proc(et: f32) {
 		}
 	}
 
+	TEXT_SIZE :: 20
 	text := "Benden Sana Gelsin"
-	text_bbox := render.text_bbox(text, 20)
+	text_bbox := render.text_bbox(font, text, TEXT_SIZE)
 
-	box_pos := render.pos_from_align_kind(client_size, render.text_bbox(text, 20), .BottomRight)
+	box_pos := render.pos_from_align_kind(
+		client_size,
+		render.text_bbox(font, text, TEXT_SIZE),
+		.BottomRight,
+	)
 
 	bg_dark := [4]f32{0.05, 0.05, 0.08, 0.85}
 	render.imm_push_rect(
@@ -247,5 +258,5 @@ torture_test_liquid_neon :: proc(et: f32) {
 		8.0,
 	)
 
-	render.imm_push_text("Benden Sana Gelsin", box_pos, 20.0, render.WHITE)
+	render.imm_push_text(font, "Benden Sana Gelsin", box_pos, TEXT_SIZE, render.WHITE)
 }

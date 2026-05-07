@@ -1,34 +1,5 @@
-/*
-@(require_results)
-	default_temp_allocator_temp_begin :: proc(loc := #caller_location) -> (temp: Arena_Temp) {
-		if context.temp_allocator.data == &global_default_temp_allocator_data {
-			temp = arena_temp_begin(&global_default_temp_allocator_data.arena, loc)
-		}
-		return
-	}
-
-	default_temp_allocator_temp_end :: proc(temp: Arena_Temp, loc := #caller_location) {
-		arena_temp_end(temp, loc)
-	}
-
-	@(fini, private)
-	_destroy_temp_allocator_fini :: proc "contextless" () {
-		default_temp_allocator_destroy(&global_default_temp_allocator_data)
-	}
-
-	@(deferred_out=default_temp_allocator_temp_end)
-DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD :: #force_inline proc(ignore := false, loc := #caller_location) -> (Arena_Temp, Source_Code_Location) {
-		if ignore {
-			return {}, loc
-		} else {
-			return default_temp_allocator_temp_begin(loc), loc
-		}
-}
-*/
-
 package render
 
-import "base:runtime"
 import "core:math/linalg"
 import "core:sys/windows"
 import "vendor:OpenGL"
@@ -56,33 +27,6 @@ Imm_Per_Data :: struct {
 		Text,
 	},
 }
-
-/*
-*
-*/
-
-_font_state: ^Font
-
-imm_font_begin :: proc(font: ^Font) -> ^Font {
-	prev_font := _font_state
-	_font_state = font
-	return prev_font
-}
-
-_deferred_font_end :: proc(prev_font: ^Font) {
-	_font_state = prev_font
-}
-
-@(deferred_out = _deferred_font_end)
-IMM_FONT_SCOPED :: #force_inline proc(font: ^Font) -> ^Font {
-	prev_font := _font_state
-	_font_state = font
-	return prev_font
-}
-
-/*
-*
-*/
 
 imm_begin_frame :: proc(allocator := context.allocator) -> bool {
 	@(static) initted: bool
@@ -218,23 +162,24 @@ imm_push_image :: proc(texture: Texture, pos, size: [2]f32, tint := WHITE, round
 */
 
 imm_push_text_grad :: proc(
+	font: Font,
 	text: string,
 	pos: [2]f32,
 	font_size: f32,
 	color_tl, color_tr, color_bl, color_br: RGBA32,
 ) {
-	if _font_state == nil || text == "" do return
+	if text == "" do return
 
-	_set_current_texture(_font_state.atlas.handle)
+	_set_current_texture(font.atlas.handle)
 
-	font_scale := font_size / _font_state.metrics.emSize
-	line_h := _font_state.metrics.lineHeight * font_scale
+	font_scale := font_size / font.metrics.emSize
+	line_h := font.metrics.lineHeight * font_scale
 
 	cursor_x := pos.x
-	cursor_y := pos.y + (_font_state.metrics.ascender * font_scale)
+	cursor_y := pos.y + (font.metrics.ascender * font_scale)
 
-	atlas_w := cast(f32)_font_state.atlas.size.x
-	atlas_h := cast(f32)_font_state.atlas.size.y
+	atlas_w := cast(f32)font.atlas.size.x
+	atlas_h := cast(f32)font.atlas.size.y
 
 	for char in text {
 		if char == '\n' { 	// TODO: handle other ctrl chars
@@ -243,8 +188,8 @@ imm_push_text_grad :: proc(
 			continue
 		}
 
-		glyph, ok := _font_state.glyphs[char]
-		if !ok do glyph = _font_state.glyphs['?']
+		glyph, ok := font.glyphs[char]
+		if !ok do glyph = font.glyphs['?']
 
 		// if glyph.atlasBounds.left == glyph.atlasBounds.right {
 		// cursor_x += glyph.advance * font_scale
@@ -285,18 +230,18 @@ imm_push_text_grad :: proc(
 	}
 }
 
-imm_push_text :: proc(text: string, pos: [2]f32, size: f32, color: RGBA32) {
-	imm_push_text_grad(text, pos, size, color, color, color, color)
+imm_push_text :: proc(font: Font, text: string, pos: [2]f32, size: f32, color: RGBA32) {
+	imm_push_text_grad(font, text, pos, size, color, color, color, color)
 }
 
-text_bbox :: proc(text: string, font_size: f32) -> [2]f32 {
-	if _font_state == nil || text == "" do return {0, 0}
+text_bbox :: proc(font: Font, text: string, font_size: f32) -> [2]f32 {
+	if text == "" do return {0, 0}
 
 	cursor_x := f32(0)
 	max_x := f32(0)
 
-	font_scale := font_size / _font_state.metrics.emSize
-	line_height := _font_state.metrics.lineHeight * font_scale
+	font_scale := font_size / font.metrics.emSize
+	line_height := font.metrics.lineHeight * font_scale
 
 	total_height := line_height
 
@@ -308,8 +253,8 @@ text_bbox :: proc(text: string, font_size: f32) -> [2]f32 {
 			continue
 		}
 
-		glyph, ok := _font_state.glyphs[char]
-		if !ok do glyph = _font_state.glyphs['?']
+		glyph, ok := font.glyphs[char]
+		if !ok do glyph = font.glyphs['?']
 
 		cursor_x += glyph.advance * font_scale
 	}
