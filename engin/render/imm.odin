@@ -5,6 +5,7 @@ import "core:sys/windows"
 import "vendor:OpenGL"
 
 import "../platform/win32"
+import "../render"
 
 /*
 *
@@ -28,21 +29,17 @@ Imm_Per_Data :: struct {
 	},
 }
 
-/*
-*
-*/
-
-imm_begin :: proc(allocator := context.allocator) -> bool {
+imm_begin_frame :: proc(allocator := context.allocator) -> bool {
 	@(static) initted: bool
 	if !initted {
 		_init_state(allocator) or_return
 		initted = true
 	}
-	set_target_to_default()
+	render.set_target_to_default()
 	return true
 }
 
-imm_end :: proc() {
+imm_end_frame :: proc() {
 	_flush()
 
 	windows.SwapBuffers(win32._hdc)
@@ -99,16 +96,16 @@ imm_push_circle :: proc(center: [2]f32, radius: f32, color: RGBA32) {
 */
 
 imm_push_image_ex_grad :: proc(
-	tex2d: Tex2D,
+	texture: Texture,
 	src_pos, src_size: [2]f32,
 	dst_pos, dst_size: [2]f32,
 	tint_tl, tint_tr, tint_bl, tint_br: RGBA32,
 	roundness := f32(0),
 ) {
-	_set_current_tex2d(tex2d.handle)
+	_set_current_texture(texture.handle)
 
-	tw := cast(f32)tex2d.size.x
-	th := cast(f32)tex2d.size.y
+	tw := cast(f32)texture.size.x
+	th := cast(f32)texture.size.y
 
 	u0 := src_pos.x / tw
 	v0 := src_pos.y / th
@@ -131,14 +128,14 @@ imm_push_image_ex_grad :: proc(
 }
 
 imm_push_image_ex :: proc(
-	tex2d: Tex2D,
+	texture: Texture,
 	src_pos, src_size: [2]f32,
 	dst_pos, dst_size: [2]f32,
 	tint := WHITE,
 	roundness := f32(0),
 ) {
 	imm_push_image_ex_grad(
-		tex2d,
+		texture,
 		src_pos,
 		src_size,
 		dst_pos,
@@ -151,8 +148,13 @@ imm_push_image_ex :: proc(
 	)
 }
 
-imm_push_image :: proc(tex2d: Tex2D, pos, size: [2]f32, tint := WHITE, roundness: f32 = 0) {
-	imm_push_image_ex(tex2d, {0, 0}, linalg.to_f32(tex2d.size), pos, size, tint, roundness)
+imm_push_image :: proc(
+	texture: render.Texture,
+	pos, size: [2]f32,
+	tint := render.WHITE,
+	roundness: f32 = 0,
+) {
+	imm_push_image_ex(texture, {0, 0}, cast([2]f32)texture.size, pos, size, tint, roundness)
 }
 
 /*
@@ -163,55 +165,52 @@ imm_push_text_grad :: proc(
 	font: Font,
 	text: string,
 	pos: [2]f32,
-	size: f32,
+	font_size: f32,
 	color_tl, color_tr, color_bl, color_br: RGBA32,
 ) {
-	_set_current_tex2d(font.tex2d.handle)
+	if text == "" do return
 
-	tw := cast(f32)font.tex2d.size.x
-	th := cast(f32)font.tex2d.size.y
+	_set_current_texture(font.atlas.handle)
+
+	font_scale := font_size / font.metrics.emSize
+	line_h := font.metrics.lineHeight * font_scale
 
 	cursor_x := pos.x
-	cursor_y := pos.y + font.ascender * size
+	cursor_y := pos.y + (font.metrics.ascender * font_scale)
 
-	prev_char: rune
+	atlas_w := cast(f32)font.atlas.size.x
+	atlas_h := cast(f32)font.atlas.size.y
 
 	for char in text {
-		if char == '\n' {
+		if char == '\n' { 	// TODO: handle other ctrl chars
 			cursor_x = pos.x
-			cursor_y += font.line_height * size
-			prev_char = 0 // reset kerning
+			cursor_y += line_h
 			continue
 		}
 
-		glyph := font.glyphs[char] or_continue
+		glyph, ok := font.glyphs[char]
+		if !ok do glyph = font.glyphs['?']
 
-		// kerning
-		if prev_char != 0 {
-			if kern_advance, ok := font.kerning[{prev_char, char}]; ok {
-				cursor_x += kern_advance * size
-			}
-		}
+		// if glyph.atlasBounds.left == glyph.atlasBounds.right {
+		// cursor_x += glyph.advance * font_scale
+		// continue
+		// }
 
-		// whitespace
-		if glyph.al == glyph.ar {
-			cursor_x += glyph.advance * size
-			prev_char = char
-			continue
-		}
+		gx := cursor_x
+		gy := cursor_y
 
 		dst := [4]f32 {
-			cursor_x + glyph.pl * size, // x0
-			cursor_y - glyph.pt * size, // y0
-			cursor_x + glyph.pr * size, // x1
-			cursor_y - glyph.pb * size, // y1
+			gx + (glyph.planeBounds.left * font_scale),
+			gy - (glyph.planeBounds.bottom * font_scale),
+			gx + (glyph.planeBounds.right * font_scale),
+			gy - (glyph.planeBounds.top * font_scale),
 		}
 
 		src := [4]f32 {
-			glyph.al / tw,
-			1.0 - (glyph.at / th), // top UV
-			glyph.ar / tw,
-			1.0 - (glyph.ab / th), // bottom UV
+			glyph.atlasBounds.left / atlas_w,
+			1 - (glyph.atlasBounds.bottom / atlas_h),
+			glyph.atlasBounds.right / atlas_w,
+			1 - (glyph.atlasBounds.top / atlas_h),
 		}
 
 		append(
@@ -227,8 +226,7 @@ imm_push_text_grad :: proc(
 			},
 		)
 
-		cursor_x += glyph.advance * size
-		prev_char = char
+		cursor_x += glyph.advance * font_scale
 	}
 }
 
@@ -236,14 +234,77 @@ imm_push_text :: proc(font: Font, text: string, pos: [2]f32, size: f32, color: R
 	imm_push_text_grad(font, text, pos, size, color, color, color, color)
 }
 
-// imm_push_scissor :: proc(x0, y0, x1, y1: i32) {
-// 	_flush()
-// 	OpenGL.Enable(OpenGL.SCISSOR_TEST)
-// 	OpenGL.Scissor(x0, y0, x1 - x0, y1 - y0)
-// }
-// imm_clear_scissor :: proc() {
-// 	OpenGL.Disable(OpenGL.SCISSOR_TEST)
-// }
+text_bbox :: proc(font: Font, text: string, font_size: f32) -> [2]f32 {
+	if text == "" do return {0, 0}
+
+	cursor_x := f32(0)
+	max_x := f32(0)
+
+	font_scale := font_size / font.metrics.emSize
+	line_height := font.metrics.lineHeight * font_scale
+
+	total_height := line_height
+
+	for char in text {
+		if char == '\n' {
+			max_x = max(max_x, cursor_x)
+			cursor_x = 0
+			total_height += line_height
+			continue
+		}
+
+		glyph, ok := font.glyphs[char]
+		if !ok do glyph = font.glyphs['?']
+
+		cursor_x += glyph.advance * font_scale
+	}
+
+	return {max(max_x, cursor_x), total_height}
+}
+
+/*
+*
+*/
+
+Align_Kind :: enum {
+	TopLeft,
+	TopCenter,
+	TopRight,
+	CenterLeft,
+	Center,
+	CenterRight,
+	BottomLeft,
+	BottomCenter,
+	BottomRight,
+}
+
+pos_from_align_kind :: proc(pos, size: [2]f32, align: Align_Kind) -> [2]f32 {
+	real_pos := pos
+
+	switch align {
+	case .TopLeft:
+	case .TopCenter:
+		real_pos.x -= size.x * 0.5
+	case .TopRight:
+		real_pos.x -= size.x
+	case .CenterLeft:
+		real_pos.y -= size.y * 0.5
+	case .Center:
+		real_pos -= size * 0.5
+	case .CenterRight:
+		real_pos.x -= size.x
+		real_pos.y -= size.y * 0.5
+	case .BottomLeft:
+		real_pos.y -= size.y
+	case .BottomCenter:
+		real_pos.x -= size.x * 0.5
+		real_pos.y -= size.y
+	case .BottomRight:
+		real_pos -= size
+	}
+
+	return real_pos
+}
 
 /*
 *
@@ -257,14 +318,14 @@ _uber_shader: Shader
 _data_list: [dynamic]Imm_Per_Data
 
 @(private = "file")
-_current_tex2d: Tex2D
+_current_texture: Texture
 @(private = "file")
-_batch_has_tex2d: bool
+_batch_has_texture: bool
 
 @(private = "file")
-_uber_vshader_src := cast(string)#load("shader_src/imm_uber_vshader.glsl")
+_uber_vshader_src := cast(string)#load("shader-src/uber-vshader.glsl")
 @(private = "file")
-_uber_fshader_src := cast(string)#load("shader_src/imm_uber_fshader.glsl")
+_uber_fshader_src := cast(string)#load("shader-src/uber-fshader.glsl")
 
 @(private = "file")
 _uber_shader_attrib_layout: []Shader_Attrib_Layout = {
@@ -281,19 +342,19 @@ _uber_shader_attrib_layout: []Shader_Attrib_Layout = {
 }
 
 @(private = "file")
-_set_current_tex2d :: proc(handle: u32) {
-	if _batch_has_tex2d && _current_tex2d.handle != handle {
+_set_current_texture :: proc(handle: u32) {
+	if _batch_has_texture && _current_texture.handle != handle {
 		_flush()
 	}
-	_current_tex2d.handle = handle
-	_batch_has_tex2d = true
+	_current_texture.handle = handle
+	_batch_has_texture = true
 }
 
 @(private = "file")
 _init_state :: proc(allocator := context.allocator) -> bool {
 	_data_list = make([dynamic]Imm_Per_Data, allocator = allocator)
 
-	_uber_shader = shader_init(_uber_vshader_src, _uber_fshader_src) or_return
+	_uber_shader = render.shader_init(_uber_vshader_src, _uber_fshader_src) or_return
 
 	OpenGL.GenVertexArrays(1, &_vao)
 	OpenGL.BindVertexArray(_vao)
@@ -309,7 +370,7 @@ _flush :: proc() -> bool {
 
 	defer {
 		clear(&_data_list)
-		_batch_has_tex2d = false
+		_batch_has_texture = false
 	}
 
 	OpenGL.Enable(OpenGL.BLEND)
@@ -347,7 +408,7 @@ _flush :: proc() -> bool {
 	// }
 
 	OpenGL.ActiveTexture(OpenGL.TEXTURE0)
-	OpenGL.BindTexture(OpenGL.TEXTURE_2D, _current_tex2d.handle)
+	OpenGL.BindTexture(OpenGL.TEXTURE_2D, _current_texture.handle)
 
 	OpenGL.BufferData(
 		OpenGL.ARRAY_BUFFER,
@@ -398,3 +459,7 @@ _shader_bind_layout :: proc(shader: Shader, stride: i32, layout: []Shader_Attrib
 
 	return true
 }
+
+/*
+*
+*/

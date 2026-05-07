@@ -1,5 +1,6 @@
 package main
 
+import "base:runtime"
 import "core:fmt"
 import "core:math"
 import "core:math/linalg"
@@ -14,18 +15,23 @@ import "engin/render"
 *
 */
 
-tex2d: render.Tex2D
 font: render.Font
 
 to_update :: proc(dt: f32) -> bool {
 	@(static) initted := false
 	if (!initted) {
-		font = render.msdf_font_load_from_file(
-			"resource/fonts/size32pxrange8/VarelaRound-Regular.json",
-			"resource/fonts/size32pxrange8/VarelaRound-Regular.png",
-		) or_return
+		defer initted = true
 
-		initted = true
+		{
+			runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
+
+			json_path, png_path := render.msdf_atlas_gen(
+				"resource/fonts/VarelaRound-Regular.ttf",
+				allocator = context.temp_allocator,
+			) or_return
+
+			font = render.msdf_load_from_file(json_path, png_path) or_return
+		}
 	}
 
 	@(static) et: f32
@@ -35,15 +41,17 @@ to_update :: proc(dt: f32) -> bool {
 	mouse_pos := linalg.to_f32(win32.get_mouse_pos())
 
 	{
-		render.imm_begin()
+		render.imm_begin_frame()
 		defer {
 			draw_fps(font, {client_size.x, 0}, 20, dt, .TopRight)
-			render.imm_end()
+			render.imm_end_frame()
 		}
 
-		aurora_bg(et)
+		render.clear_target(render.NAYSAYER_BG)
+
 		torture_test_liquid_neon(font, et)
 
+		// draw_some_text(font, {20, 0}, render.RAYWHITE)
 	}
 
 	return true
@@ -96,7 +104,7 @@ draw_fps :: proc(
 	pos: [2]f32,
 	font_size: f32,
 	dt: f32,
-	align_kind: render.Align_Kind = .TopLeft,
+	align_kind := render.Align_Kind.TopLeft,
 ) {
 	@(static) et: f32
 	@(static) fps: u32
@@ -109,7 +117,7 @@ draw_fps :: proc(
 		fps += 1
 	}
 
-	for et >= 1. {
+	if et >= 1. {
 		fps_str = fmt.bprintf(fps_buf[:], "FPS: %v", fps)
 
 		et -= 1.
@@ -124,6 +132,31 @@ draw_fps :: proc(
 /*
 *
 */
+
+draw_some_text :: proc(font: render.Font, pos: [2]f32, color: render.RGBA32) {
+	y := pos.y
+
+	for i in 0 ..= 32 {
+		font_size := (cast(f32)i + 4) * 1
+		font_scale := font_size / font.metrics.emSize
+		line_h := font.metrics.lineHeight * font_scale
+		defer y += line_h
+
+		{
+			runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
+
+			render.imm_push_text(
+				font,
+				fmt.tprintf("Gardaşlarımdan birkaçısın, size %v", font_size),
+				// fmt.tprintf("The quick brown fox jumps over the lazy dog, size %v", font_size),
+				{pos.x, y},
+				font_size,
+				color,
+			)
+		}
+	}
+}
+
 
 aurora_bg :: proc(et: f32) {
 	client := linalg.to_f32(win32.get_client_size())
@@ -230,5 +263,5 @@ torture_test_liquid_neon :: proc(font: render.Font, et: f32) {
 		render.text_bbox(font, text, 20),
 		.Center,
 	)
-	render.imm_push_text(font, text, text_pos, 20.0, render.WHITE)
+	render.imm_push_text(font, "Benden Sana Gelsin", text_pos, 20.0, render.WHITE)
 }
