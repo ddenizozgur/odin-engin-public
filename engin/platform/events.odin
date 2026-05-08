@@ -167,26 +167,24 @@ Mouse_Button :: enum {
 *
 */
 
-_Key_State_Flags :: enum {
-	Down,
+Key_State :: enum {
 	Pressed,
 	Released,
 }
-Key_State_Flags :: bit_set[_Key_State_Flags]
 
 // TODO: change repeat??
 Event_Key :: struct {
 	code:         Key_Code,
 	mode:         Key_Mode_Flags,
-	state:        Key_State_Flags,
-	// is_repeat:    bool,
+	state:        Key_State,
+	is_repeat:    bool,
 	repeat_count: int, // TODO: it must be zero while release
 }
 Event_Text :: distinct rune
 
 Event_Mouse_Button :: struct {
 	button: Mouse_Button,
-	state:  Key_State_Flags,
+	state:  Key_State,
 }
 Event_Mouse_Move :: distinct [2]i32
 Event_Mouse_Scroll :: distinct [2]f32
@@ -218,13 +216,33 @@ events_this_frame: [dynamic]Event
 *
 */
 
-// Mouse_Source :: enum {
-// 	Mouse = 0,
-// 	Pen,
-// 	TouchScreen,
-// }
+_mouse_up_down_prev_frame: [Mouse_Button]bool
+_mouse_up_down_this_frame: [Mouse_Button]bool
+
+mouse_is_down :: proc(btn: Mouse_Button) -> bool {
+	return _mouse_up_down_this_frame[btn]
+}
+
+mouse_is_pressed :: proc(btn: Mouse_Button) -> bool {
+	was_down := _mouse_up_down_prev_frame[btn]
+	is_down := _mouse_up_down_this_frame[btn]
+	return is_down && !was_down
+}
+
+mouse_is_released :: proc(btn: Mouse_Button) -> bool {
+	was_down := _mouse_up_down_prev_frame[btn]
+	is_down := _mouse_up_down_this_frame[btn]
+	return !is_down && was_down
+}
+
 
 /*
+Mouse_Source :: enum {
+	Mouse = 0,
+	Pen,
+	TouchScreen,
+}
+
 Mouse_Cursor :: enum {
     DEFAULT       = 0,  // Default pointer shape
     ARROW         = 1,  // Arrow shape

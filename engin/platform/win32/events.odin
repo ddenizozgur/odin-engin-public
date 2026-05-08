@@ -9,6 +9,10 @@ import "core:sys/windows"
 poll_events_this_frame :: proc() {
 	clear(&platform.events_this_frame)
 
+	for btn in platform.Mouse_Button {
+		platform._mouse_up_down_prev_frame[btn] = platform._mouse_up_down_this_frame[btn]
+	}
+
 	msg: windows.MSG
 	for windows.PeekMessageW(&msg, nil, 0, 0, windows.PM_REMOVE) {
 		windows.TranslateMessage(&msg)
@@ -54,6 +58,8 @@ _window_proc :: proc "system" (
 			append(&platform.events_this_frame, platform.Event_Window_Minimize{})
 		case windows.SIZE_MAXIMIZED:
 			append(&platform.events_this_frame, platform.Event_Window_Maximize{})
+		// case windows.SIZE_RESTORED:
+		// 	append(&platform.events_this_frame, platform.Event_Window_Restore{})
 		}
 
 	case windows.WM_SETFOCUS:
@@ -72,62 +78,87 @@ _window_proc :: proc "system" (
 
 	case windows.WM_LBUTTONUP:
 		windows.ReleaseCapture()
+
+		btn := platform.Mouse_Button.Left
+		platform._mouse_up_down_this_frame[btn] = false
+
 		append(
 			&platform.events_this_frame,
-			platform.Event_Mouse_Button{state = {.Released}, button = .Left},
+			platform.Event_Mouse_Button{state = .Released, button = btn},
 		)
 	case windows.WM_LBUTTONDOWN:
 		windows.SetCapture(hwnd)
+
+		btn := platform.Mouse_Button.Left
+		platform._mouse_up_down_this_frame[btn] = true
+
 		append(
 			&platform.events_this_frame,
-			platform.Event_Mouse_Button{state = {.Pressed}, button = .Left},
+			platform.Event_Mouse_Button{state = .Pressed, button = btn},
 		)
 	case windows.WM_MBUTTONUP:
 		windows.ReleaseCapture()
+
+		btn := platform.Mouse_Button.Middle
+		platform._mouse_up_down_this_frame[btn] = false
+
 		append(
 			&platform.events_this_frame,
-			platform.Event_Mouse_Button{state = {.Released}, button = .Middle},
+			platform.Event_Mouse_Button{state = .Released, button = btn},
 		)
 	case windows.WM_MBUTTONDOWN:
 		windows.SetCapture(hwnd)
+
+		btn := platform.Mouse_Button.Middle
+		platform._mouse_up_down_this_frame[btn] = true
+
 		append(
 			&platform.events_this_frame,
-			platform.Event_Mouse_Button{state = {.Pressed}, button = .Middle},
+			platform.Event_Mouse_Button{state = .Pressed, button = btn},
 		)
 	case windows.WM_RBUTTONUP:
 		windows.ReleaseCapture()
+
+		btn := platform.Mouse_Button.Right
+		platform._mouse_up_down_this_frame[btn] = false
+
 		append(
 			&platform.events_this_frame,
-			platform.Event_Mouse_Button{state = {.Released}, button = .Right},
+			platform.Event_Mouse_Button{state = .Released, button = btn},
 		)
 	case windows.WM_RBUTTONDOWN:
 		windows.SetCapture(hwnd)
+
+		btn := platform.Mouse_Button.Right
+		platform._mouse_up_down_this_frame[btn] = true
+
 		append(
 			&platform.events_this_frame,
-			platform.Event_Mouse_Button{state = {.Pressed}, button = .Right},
+			platform.Event_Mouse_Button{state = .Pressed, button = btn},
 		)
 	case windows.WM_XBUTTONUP:
 		windows.ReleaseCapture()
 		// https://learn.microsoft.com/en-us/windows/win32/inputdev/wm-xbuttondown
 		// Unlike the WM_LBUTTONDOWN, WM_MBUTTONDOWN, and WM_RBUTTONDOWN messages,
 		// an application should return TRUE from this message if it processes it
-		result = 1
+		defer result = 1
+		btn: platform.Mouse_Button = windows.HIWORD(wparam) == 1 ? .XButton1 : .XButton2
+		platform._mouse_up_down_this_frame[btn] = false
+
 		append(
 			&platform.events_this_frame,
-			platform.Event_Mouse_Button {
-				state = {.Released},
-				button = windows.HIWORD(wparam) == 1 ? .XButton1 : .XButton2,
-			},
+			platform.Event_Mouse_Button{state = .Released, button = btn},
 		)
 	case windows.WM_XBUTTONDOWN:
 		windows.SetCapture(hwnd)
-		result = 1
+
+		defer result = 1
+		btn: platform.Mouse_Button = windows.HIWORD(wparam) == 1 ? .XButton1 : .XButton2
+		platform._mouse_up_down_this_frame[btn] = true
+
 		append(
 			&platform.events_this_frame,
-			platform.Event_Mouse_Button {
-				state = {.Pressed},
-				button = windows.HIWORD(wparam) == 1 ? .XButton1 : .XButton2,
-			},
+			platform.Event_Mouse_Button{state = .Pressed, button = btn},
 		)
 
 	case windows.WM_MOUSEMOVE:
@@ -156,21 +187,14 @@ _window_proc :: proc "system" (
 		was_down := (lparam & (1 << 30)) != 0
 		is_down := (lparam & (1 << 31)) == 0
 
-		state: platform.Key_State_Flags
-		if is_down {
-			state += {.Down}
-			if !was_down do state += {.Pressed}
-		} else {
-			if was_down do state += {.Released}
-		}
-
 		append(
 			&platform.events_this_frame,
 			platform.Event_Key {
 				code = _keycode_from_vkey(cast(u32)wparam),
 				mode = _get_keymode(),
-				state = state,
-				repeat_count = is_down ? 0 : lparam & 0xffff,
+				state = is_down ? .Pressed : .Released,
+				is_repeat = is_down && was_down,
+				repeat_count = is_down ? lparam & 0xffff : 0,
 			},
 		)
 

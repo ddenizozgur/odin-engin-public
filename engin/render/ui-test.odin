@@ -1,5 +1,6 @@
 package render
 
+import "../platform"
 import "../platform/win32"
 import "core:math/linalg"
 import "core:sys/windows"
@@ -13,10 +14,6 @@ point_within_rect :: proc(p: [2]f32, pos, size: [2]f32) -> bool {
 		return false
 	}
 	return false
-}
-
-_lb_press :: proc() -> bool {
-	return cast(u16)windows.GetAsyncKeyState(windows.VK_LBUTTON) & 0x8000 != 0
 }
 
 PAD :: [2]f32{6, 2}
@@ -34,7 +31,7 @@ draw_button_flat_dark :: proc(font: Font, text: string, pos: [2]f32, font_size: 
 	text_pos := pos + PAD
 
 	hover := point_within_rect(mouse_pos, pos, bbox_rect)
-	pressed := hover && _lb_press() // its just for rendering. in logic wise, button must fire when release
+	pressed := hover && platform.mouse_is_down(.Left) // its just for rendering. in logic wise, button must fire when release
 
 	if pressed {
 		imm_push_rect_grad(pos, bbox_rect, PRESSED, PRESSED, PRESSED, PRESSED, 8)
@@ -46,7 +43,7 @@ draw_button_flat_dark :: proc(font: Font, text: string, pos: [2]f32, font_size: 
 
 	imm_push_text(font, text, text_pos, font_size, LABEL)
 
-	return pressed// && _lb_release()
+	return hover && platform.mouse_is_released(.Left)
 }
 
 ui_to_test :: proc(font: Font) {

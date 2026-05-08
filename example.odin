@@ -44,11 +44,11 @@ to_update :: proc(dt: f32) -> bool {
 		aurora_bg(et)
 		// render.clear_target(render.NAYSAYER_BG)
 
-		torture_test_liquid_neon(font, et)
+		// torture_test_liquid_neon(font, et)
 
-		// render.ui_to_test(font)
+		render.ui_to_test(font)
 
-		draw_some_text(font, {0, 0}, 1, render.RAYWHITE)
+		// draw_some_text(font, {0, 0}, 1, render.RAYWHITE)
 
 		draw_fps(font, {client_size.x, 0}, 20, dt, .TopRight)
 	}
@@ -74,24 +74,18 @@ main :: proc() {
 		duration := time.diff(prev_time, curr_time)
 		dt := cast(f32)time.duration_seconds(duration)
 		prev_time = curr_time
-		// print_fps(delta_time)
 
 		win32.poll_events_this_frame()
 		for event in platform.events_this_frame {
 			#partial switch data in event {
 			case platform.Event_Window_Close:
 				break frame_loop
-			case platform.Event_Mouse_Button:
-				if data.state == {.Pressed} do mouse_pressed = true
-				if data.state == {.Released} do mouse_pressed = false
 			}
 		}
 
 		to_update(dt)
 	}
 }
-
-mouse_pressed := false
 
 @(export) //link_name="NvOptimusEnablement"
 NvOptimusEnablement: u32 = 1
