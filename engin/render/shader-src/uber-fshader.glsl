@@ -25,11 +25,11 @@ float gradient_noise(vec2 n) {
   return fract(52.9829189 * fract(f));
 }
 
-#define SHADER_KIND_RECT	0
+#define SHADER_KIND_RECT  0
 #define SHADER_KIND_IMAGE	1
 #define SHADER_KIND_TEXT	2
 
-#define TEXT_THICKNESS	0.6
+#define TEXT_THICKNESS	0.6 // 0.5 is default
 #define MSDF_PXRANGE    8.0
 
 void main() {

@@ -60,7 +60,7 @@ _window_proc :: proc "system" (
 		append(&platform.events_this_frame, platform.Event_Window_Focus{})
 	case windows.WM_KILLFOCUS:
 		append(&platform.events_this_frame, platform.Event_Window_UnFocus{})
-		// TODO: ??? windows.ReleaseCapture()
+	// TODO: ??? windows.ReleaseCapture()
 
 	case windows.WM_INPUT: // TODO: rawinput
 	case windows.WM_PAINT:
@@ -74,37 +74,37 @@ _window_proc :: proc "system" (
 		windows.ReleaseCapture()
 		append(
 			&platform.events_this_frame,
-			platform.Event_Mouse_Button{state = .Released, button = .Left},
+			platform.Event_Mouse_Button{state = {.Released}, button = .Left},
 		)
 	case windows.WM_LBUTTONDOWN:
 		windows.SetCapture(hwnd)
 		append(
 			&platform.events_this_frame,
-			platform.Event_Mouse_Button{state = .Pressed, button = .Left},
+			platform.Event_Mouse_Button{state = {.Pressed}, button = .Left},
 		)
 	case windows.WM_MBUTTONUP:
 		windows.ReleaseCapture()
 		append(
 			&platform.events_this_frame,
-			platform.Event_Mouse_Button{state = .Released, button = .Middle},
+			platform.Event_Mouse_Button{state = {.Released}, button = .Middle},
 		)
 	case windows.WM_MBUTTONDOWN:
 		windows.SetCapture(hwnd)
 		append(
 			&platform.events_this_frame,
-			platform.Event_Mouse_Button{state = .Pressed, button = .Middle},
+			platform.Event_Mouse_Button{state = {.Pressed}, button = .Middle},
 		)
 	case windows.WM_RBUTTONUP:
 		windows.ReleaseCapture()
 		append(
 			&platform.events_this_frame,
-			platform.Event_Mouse_Button{state = .Released, button = .Right},
+			platform.Event_Mouse_Button{state = {.Released}, button = .Right},
 		)
 	case windows.WM_RBUTTONDOWN:
 		windows.SetCapture(hwnd)
 		append(
 			&platform.events_this_frame,
-			platform.Event_Mouse_Button{state = .Pressed, button = .Right},
+			platform.Event_Mouse_Button{state = {.Pressed}, button = .Right},
 		)
 	case windows.WM_XBUTTONUP:
 		windows.ReleaseCapture()
@@ -115,7 +115,7 @@ _window_proc :: proc "system" (
 		append(
 			&platform.events_this_frame,
 			platform.Event_Mouse_Button {
-				state = .Released,
+				state = {.Released},
 				button = windows.HIWORD(wparam) == 1 ? .XButton1 : .XButton2,
 			},
 		)
@@ -125,7 +125,7 @@ _window_proc :: proc "system" (
 		append(
 			&platform.events_this_frame,
 			platform.Event_Mouse_Button {
-				state = .Pressed,
+				state = {.Pressed},
 				button = windows.HIWORD(wparam) == 1 ? .XButton1 : .XButton2,
 			},
 		)
@@ -144,7 +144,9 @@ _window_proc :: proc "system" (
 
 	case windows.WM_SYSKEYUP, windows.WM_SYSKEYDOWN:
 		if wparam == windows.VK_F4 {
-			return windows.DefWindowProcW(hwnd, msg, wparam, lparam)
+			// return windows.DefWindowProcW(hwnd, msg, wparam, lparam)
+			append(&platform.events_this_frame, platform.Event_Window_Close{})
+			break
 		}
 		if wparam != windows.VK_MENU && (wparam < windows.VK_F1 || wparam > windows.VK_F24) {
 			result = windows.DefWindowProcW(hwnd, msg, wparam, lparam)
@@ -153,14 +155,22 @@ _window_proc :: proc "system" (
 	case windows.WM_KEYUP, windows.WM_KEYDOWN:
 		was_down := (lparam & (1 << 30)) != 0
 		is_down := (lparam & (1 << 31)) == 0
+
+		state: platform.Key_State_Flags
+		if is_down {
+			state += {.Down}
+			if !was_down do state += {.Pressed}
+		} else {
+			if was_down do state += {.Released}
+		}
+
 		append(
 			&platform.events_this_frame,
 			platform.Event_Key {
 				code = _keycode_from_vkey(cast(u32)wparam),
 				mode = _get_keymode(),
-				state = is_down ? .Pressed : .Released,
-				is_repeat = was_down && is_down,
-				repeat_count = lparam & 0xffff,
+				state = state,
+				repeat_count = is_down ? 0 : lparam & 0xffff,
 			},
 		)
 

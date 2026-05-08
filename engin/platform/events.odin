@@ -167,24 +167,26 @@ Mouse_Button :: enum {
 *
 */
 
-Key_State :: enum {
+_Key_State_Flags :: enum {
+	Down,
 	Pressed,
 	Released,
 }
+Key_State_Flags :: bit_set[_Key_State_Flags]
 
 // TODO: change repeat??
 Event_Key :: struct {
 	code:         Key_Code,
 	mode:         Key_Mode_Flags,
-	state:        Key_State,
-	is_repeat:    bool,
+	state:        Key_State_Flags,
+	// is_repeat:    bool,
 	repeat_count: int, // TODO: it must be zero while release
 }
 Event_Text :: distinct rune
 
 Event_Mouse_Button :: struct {
 	button: Mouse_Button,
-	state:  Key_State,
+	state:  Key_State_Flags,
 }
 Event_Mouse_Move :: distinct [2]i32
 Event_Mouse_Scroll :: distinct [2]f32

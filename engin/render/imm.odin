@@ -230,8 +230,8 @@ imm_push_text_grad :: proc(
 	}
 }
 
-imm_push_text :: proc(font: Font, text: string, pos: [2]f32, size: f32, color: RGBA32) {
-	imm_push_text_grad(font, text, pos, size, color, color, color, color)
+imm_push_text :: proc(font: Font, text: string, pos: [2]f32, font_size: f32, color: RGBA32) {
+	imm_push_text_grad(font, text, pos, font_size, color, color, color, color)
 }
 
 text_bbox :: proc(font: Font, text: string, font_size: f32) -> [2]f32 {

@@ -41,11 +41,14 @@ to_update :: proc(dt: f32) -> bool {
 	{
 		render.IMM_FRAME_SCOPED()
 
-		// aurora_bg(et)
-		render.clear_target(render.NAYSAYER_BG)
+		aurora_bg(et)
+		// render.clear_target(render.NAYSAYER_BG)
 
-		// torture_test_liquid_neon(font, et)
-		draw_some_text(font, {0, 0}, math.sin_f32(et) * 0.5 + 1., render.RAYWHITE)
+		torture_test_liquid_neon(font, et)
+
+		// render.ui_to_test(font)
+
+		draw_some_text(font, {0, 0}, 1, render.RAYWHITE)
 
 		draw_fps(font, {client_size.x, 0}, 20, dt, .TopRight)
 	}
@@ -79,8 +82,8 @@ main :: proc() {
 			case platform.Event_Window_Close:
 				break frame_loop
 			case platform.Event_Mouse_Button:
-				if data.state == .Pressed do mouse_pressed = true
-				if data.state == .Released do mouse_pressed = false
+				if data.state == {.Pressed} do mouse_pressed = true
+				if data.state == {.Released} do mouse_pressed = false
 			}
 		}
 

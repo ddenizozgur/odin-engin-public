@@ -75,8 +75,8 @@ MSDF_File :: struct {
 	// kerning: []MSDF_KerningPair,
 }
 
-msdf_load_from_image :: proc(
-	json_path: string,
+msdf_load_from_memory :: proc(
+	json_data: []byte,
 	img: ^image.Image,
 	allocator := context.allocator,
 ) -> (
@@ -84,7 +84,7 @@ msdf_load_from_image :: proc(
 	ok: bool,
 ) {
 	inner :: proc(
-		json_path: string,
+		json_data: []byte,
 		img: ^image.Image,
 		temp_alloc: runtime.Allocator,
 		final_alloc: runtime.Allocator,
@@ -92,14 +92,8 @@ msdf_load_from_image :: proc(
 		font: Font,
 		ok: bool,
 	) {
-		file_data, file_err := os.read_entire_file(json_path, allocator = temp_alloc)
-		if file_err != nil {
-			fmt.eprintfln("[ERROR] Failed to read font JSON: %v", json_path)
-			return {}, false
-		}
-
 		msdf_data: MSDF_File
-		if json_err := json.unmarshal(file_data, &msdf_data, allocator = temp_alloc);
+		if json_err := json.unmarshal(json_data, &msdf_data, allocator = temp_alloc);
 		   json_err != nil {
 			fmt.eprintfln("[ERROR] Failed to parse MSDF JSON: %v", json_err)
 			return {}, false
@@ -137,11 +131,11 @@ msdf_load_from_image :: proc(
 	}
 
 	if allocator == context.temp_allocator {
-		return inner(json_path, img, allocator, allocator)
+		return inner(json_data, img, allocator, allocator)
 	}
 
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
-	return inner(json_path, img, context.temp_allocator, allocator)
+	return inner(json_data, img, context.temp_allocator, allocator)
 }
 
 msdf_load_from_file :: proc(
@@ -161,12 +155,19 @@ msdf_load_from_file :: proc(
 		Font,
 		bool,
 	) {
+		json_data, json_err := os.read_entire_file(json_path, allocator = temp_alloc)
+		if json_err != nil {
+			fmt.eprintfln("[ERROR] Failed to read font JSON: %v", json_path)
+			return {}, false
+		}
+
 		img, img_err := image.load_from_file(img_path, allocator = temp_alloc)
 		if img_err != nil {
 			fmt.eprintfln("[ERROR] image.load_from_file(): %v", img_err)
 			return {}, false
 		}
-		return msdf_load_from_image(json_path, img, allocator = final_alloc)
+
+		return msdf_load_from_memory(json_data, img, allocator = final_alloc)
 	}
 
 	if allocator == context.temp_allocator {
@@ -176,7 +177,6 @@ msdf_load_from_file :: proc(
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 	return inner(json_path, img_path, context.temp_allocator, allocator)
 }
-
 
 /*
 *
@@ -256,6 +256,7 @@ msdf_atlas_gen :: proc(
 			)
 			return "", "", false
 		}
+		defer _ = os.process_terminate(process) // TODO: check
 
 		state, wait_err := os.process_wait(process)
 		if wait_err != nil || !state.success {
@@ -274,3 +275,7 @@ msdf_atlas_gen :: proc(
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 	return inner(ttf_path, context.temp_allocator, allocator)
 }
+
+/*
+*
+*/
