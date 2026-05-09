@@ -7,11 +7,12 @@ import "core:sys/windows"
 
 // TODO: blocking version
 poll_events_this_frame :: proc() {
-	clear(&platform.events_this_frame)
-
 	for btn in platform.Mouse_Button {
-		platform._mouse_up_down_prev_frame[btn] = platform._mouse_up_down_this_frame[btn]
+		btn_this_frame := platform._mouse_btns_this_frame[btn]
+		platform._mouse_btns_prev_frame[btn] = btn_this_frame
 	}
+
+	clear(&platform.events_this_frame)
 
 	msg: windows.MSG
 	for windows.PeekMessageW(&msg, nil, 0, 0, windows.PM_REMOVE) {
@@ -80,7 +81,7 @@ _window_proc :: proc "system" (
 		windows.ReleaseCapture()
 
 		btn := platform.Mouse_Button.Left
-		platform._mouse_up_down_this_frame[btn] = false
+		platform._mouse_btns_this_frame[btn] = false
 
 		append(
 			&platform.events_this_frame,
@@ -90,7 +91,7 @@ _window_proc :: proc "system" (
 		windows.SetCapture(hwnd)
 
 		btn := platform.Mouse_Button.Left
-		platform._mouse_up_down_this_frame[btn] = true
+		platform._mouse_btns_this_frame[btn] = true
 
 		append(
 			&platform.events_this_frame,
@@ -100,7 +101,7 @@ _window_proc :: proc "system" (
 		windows.ReleaseCapture()
 
 		btn := platform.Mouse_Button.Middle
-		platform._mouse_up_down_this_frame[btn] = false
+		platform._mouse_btns_this_frame[btn] = false
 
 		append(
 			&platform.events_this_frame,
@@ -110,7 +111,7 @@ _window_proc :: proc "system" (
 		windows.SetCapture(hwnd)
 
 		btn := platform.Mouse_Button.Middle
-		platform._mouse_up_down_this_frame[btn] = true
+		platform._mouse_btns_this_frame[btn] = true
 
 		append(
 			&platform.events_this_frame,
@@ -120,7 +121,7 @@ _window_proc :: proc "system" (
 		windows.ReleaseCapture()
 
 		btn := platform.Mouse_Button.Right
-		platform._mouse_up_down_this_frame[btn] = false
+		platform._mouse_btns_this_frame[btn] = false
 
 		append(
 			&platform.events_this_frame,
@@ -130,7 +131,7 @@ _window_proc :: proc "system" (
 		windows.SetCapture(hwnd)
 
 		btn := platform.Mouse_Button.Right
-		platform._mouse_up_down_this_frame[btn] = true
+		platform._mouse_btns_this_frame[btn] = true
 
 		append(
 			&platform.events_this_frame,
@@ -143,7 +144,7 @@ _window_proc :: proc "system" (
 		// an application should return TRUE from this message if it processes it
 		defer result = 1
 		btn: platform.Mouse_Button = windows.HIWORD(wparam) == 1 ? .XButton1 : .XButton2
-		platform._mouse_up_down_this_frame[btn] = false
+		platform._mouse_btns_this_frame[btn] = false
 
 		append(
 			&platform.events_this_frame,
@@ -154,7 +155,7 @@ _window_proc :: proc "system" (
 
 		defer result = 1
 		btn: platform.Mouse_Button = windows.HIWORD(wparam) == 1 ? .XButton1 : .XButton2
-		platform._mouse_up_down_this_frame[btn] = true
+		platform._mouse_btns_this_frame[btn] = true
 
 		append(
 			&platform.events_this_frame,
@@ -187,11 +188,28 @@ _window_proc :: proc "system" (
 		was_down := (lparam & (1 << 30)) != 0
 		is_down := (lparam & (1 << 31)) == 0
 
+		keycode := _keycode_from_vkey(cast(u32)wparam)
+		keymode := _get_keymode()
+
+		#partial switch keycode {
+		case .Ctrl:
+			keymode -= {.Ctrl}
+		case .Shift:
+			keymode -= {.Shift}
+		case .Alt:
+			keymode -= {.Alt}
+		// case .Super: keymode -= {.Super}
+		case .CapsLock:
+			keymode -= {.CapsLock}
+		case .NumLock:
+			keymode -= {.NumLock}
+		}
+
 		append(
 			&platform.events_this_frame,
 			platform.Event_Key {
-				code = _keycode_from_vkey(cast(u32)wparam),
-				mode = _get_keymode(),
+				code = keycode,
+				mode = keymode,
 				state = is_down ? .Pressed : .Released,
 				is_repeat = is_down && was_down,
 				repeat_count = is_down ? lparam & 0xffff : 0,
@@ -257,9 +275,9 @@ _get_keymode :: proc() -> platform.Key_Mode_Flags {
 	if cast(u16)windows.GetKeyState(windows.VK_CAPITAL) & 1 != 0 do keymode |= {.CapsLock}
 	if cast(u16)windows.GetKeyState(windows.VK_NUMLOCK) & 1 != 0 do keymode |= {.NumLock}
 
-	lwin := cast(u16)windows.GetKeyState(windows.VK_LWIN) & 0x8000 != 0
-	rwin := cast(u16)windows.GetKeyState(windows.VK_RWIN) & 0x8000 != 0
-	if lwin || rwin do keymode |= {.Super}
+	// lwin := cast(u16)windows.GetKeyState(windows.VK_LWIN) & 0x8000 != 0
+	// rwin := cast(u16)windows.GetKeyState(windows.VK_RWIN) & 0x8000 != 0
+	// if lwin || rwin do keymode |= {.Super}
 
 	return keymode
 }
@@ -383,8 +401,8 @@ _keycode_from_vkey :: proc(vkey: u32) -> platform.Key_Code {
 		return .CapsLock
 	case windows.VK_NUMLOCK:
 		return .NumLock
-	case windows.VK_SCROLL:
-		return .ScrollLock
+	// case windows.VK_SCROLL:
+	// 	return .ScrollLock
 	case windows.VK_APPS:
 		return .Menu
 	case windows.VK_CONTROL:
@@ -526,8 +544,8 @@ _vkey_from_keycode :: proc(keycode: platform.Key_Code) -> u32 {
 		return windows.VK_SPACE
 	case .Menu:
 		return windows.VK_APPS
-	case .ScrollLock:
-		return windows.VK_SCROLL
+	// case .ScrollLock:
+	// 	return windows.VK_SCROLL
 	case .Pause:
 		return windows.VK_PAUSE
 	case .Insert:

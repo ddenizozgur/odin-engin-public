@@ -5,7 +5,7 @@ _Key_Mode_Flags :: enum {
 	Shift,
 	Ctrl,
 	Alt,
-	Super,
+	// Super,
 	CapsLock,
 	NumLock,
 	// ScrollLock, ???
@@ -95,7 +95,7 @@ Key_Code :: enum u32 {
 	Alt,
 	Space,
 	Menu,
-	ScrollLock,
+	// ScrollLock,
 	Pause,
 	Insert,
 	Home,
@@ -216,22 +216,22 @@ events_this_frame: [dynamic]Event
 *
 */
 
-_mouse_up_down_prev_frame: [Mouse_Button]bool
-_mouse_up_down_this_frame: [Mouse_Button]bool
+_mouse_btns_prev_frame: [Mouse_Button]bool
+_mouse_btns_this_frame: [Mouse_Button]bool
 
 mouse_is_down :: proc(btn: Mouse_Button) -> bool {
-	return _mouse_up_down_this_frame[btn]
+	return _mouse_btns_this_frame[btn]
 }
 
 mouse_is_pressed :: proc(btn: Mouse_Button) -> bool {
-	was_down := _mouse_up_down_prev_frame[btn]
-	is_down := _mouse_up_down_this_frame[btn]
+	was_down := _mouse_btns_prev_frame[btn]
+	is_down := _mouse_btns_this_frame[btn]
 	return is_down && !was_down
 }
 
 mouse_is_released :: proc(btn: Mouse_Button) -> bool {
-	was_down := _mouse_up_down_prev_frame[btn]
-	is_down := _mouse_up_down_this_frame[btn]
+	was_down := _mouse_btns_prev_frame[btn]
+	is_down := _mouse_btns_this_frame[btn]
 	return !is_down && was_down
 }
 

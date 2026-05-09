@@ -7,8 +7,8 @@ import "core:sys/windows"
 
 point_within_rect :: proc(p: [2]f32, pos, size: [2]f32) -> bool {
 	if p.x > pos.x && p.y > pos.y {
-		tmp := pos + size
-		if p.x < tmp.x && p.y < tmp.y {
+		br := pos + size
+		if p.x < br.x && p.y < br.y {
 			return true
 		}
 		return false
@@ -16,8 +16,121 @@ point_within_rect :: proc(p: [2]f32, pos, size: [2]f32) -> bool {
 	return false
 }
 
-PAD :: [2]f32{6, 2}
+_UI_Widget_Flags :: enum {
+	Clickable,
+	// ViewScroll,
+	DrawText,
+	// DrawBorder,
+	DrawBackground,
+	// DrawDropShadow,
+	// Clip,
+	// HotAnimation,
+	// ActiveAnimation,
+}
+UI_Widget_Flags :: bit_set[_UI_Widget_Flags]
 
+UI_Action :: struct {
+	hovered: bool,
+	clicked: bool,
+}
+
+ui_widget_base :: proc(text: string, pos: [2]f32, flags: UI_Widget_Flags) -> UI_Action {
+	bbox := text_bbox(_font, text, _font_size)
+	mouse_pos := cast([2]f32)win32.get_mouse_pos()
+
+	bbox_rect := bbox + _PADDING * 2
+	text_pos := pos + _PADDING
+
+	hovered := point_within_rect(mouse_pos, pos, bbox_rect)
+	pressed := hovered && platform.mouse_is_down(.Left)
+	clicked := hovered && platform.mouse_is_released(.Left)
+
+	if .DrawBackground in flags {
+		tcol := _DARK_GRAY
+		bcol := _DARK_GRAY
+
+		if .Clickable in flags {
+			if pressed {
+				tcol = _DARKER_GRAY
+				bcol = _DARKER_GRAY
+			} else if hovered {
+				tcol = _LIGHT_GRAY
+				bcol = _DARK_GRAY
+			}
+		} else {
+			tcol = _DARKER_GRAY
+			bcol = _DARKER_GRAY
+		}
+
+		imm_push_rect_grad(pos, bbox_rect, tcol, tcol, bcol, bcol, _ROUNDNESS)
+	}
+
+	if .DrawText in flags {
+		imm_push_text(_font, text, text_pos, _font_size, _ALMOST_WHITE)
+	}
+
+	return {hovered = hovered, clicked = .Clickable in flags ? clicked : false}
+}
+
+ui_button :: #force_inline proc(text: string, pos: [2]f32) -> UI_Action {
+	return ui_widget_base(text, pos, {.Clickable, .DrawBackground, .DrawText})
+}
+ui_label :: #force_inline proc(text: string, pos: [2]f32) -> UI_Action {
+	return ui_widget_base(text, pos, {.DrawText})
+}
+ui_panel :: #force_inline proc(text: string, pos: [2]f32) -> UI_Action {
+	return ui_widget_base(text, pos, {.DrawBackground, .DrawText})
+}
+
+ui_begin_frame :: proc(font: Font) {
+	_font = font
+}
+ui_end_frame :: proc() {
+}
+@(deferred_out = ui_end_frame)
+UI_FRAME_SCOPED :: #force_inline proc(font: Font) {
+	ui_begin_frame(font)
+}
+
+/*
+*
+*/
+
+_ROUNDNESS :: 6
+_PADDING :: [2]f32{6, 2}
+
+_DARK_GRAY :: RGBA32{55, 55, 55, 255}
+_LIGHT_GRAY :: RGBA32{85, 85, 85, 255}
+_DARKER_GRAY :: RGBA32{35, 35, 35, 255}
+_ALMOST_WHITE :: RGBA32{245, 245, 245, 255}
+
+_font: Font
+_font_size := f32(18)
+
+_idle_bg_col := _DARK_GRAY
+_pressed_bg_col := _DARKER_GRAY
+_hover_bg_top_col := _LIGHT_GRAY
+_hover_bg_btm_col := _DARK_GRAY
+
+ui_to_test :: proc(font: Font) {
+	UI_FRAME_SCOPED(font)
+
+	@(static) did := false
+	if ui_button("Continue", {100, 40}).clicked {
+		did = !did
+	}
+
+	if did {
+		ui_label("Press", {100, 80})
+		ui_button("Handling...", {100, 120})
+	}
+
+	ui_panel("Yer Seviyesi", {100, 160})
+	ui_button("Basma Bana", {100, 200})
+}
+
+/*
+*
 draw_button_flat_dark :: proc(font: Font, text: string, pos: [2]f32, font_size: f32) -> bool {
 	IDLE :: RGBA32{60, 60, 60, 255}
 	HOVER :: RGBA32{85, 85, 85, 255}
@@ -27,8 +140,8 @@ draw_button_flat_dark :: proc(font: Font, text: string, pos: [2]f32, font_size: 
 	bbox := text_bbox(font, text, font_size)
 	mouse_pos := cast([2]f32)win32.get_mouse_pos()
 
-	bbox_rect := bbox + PAD * 2
-	text_pos := pos + PAD
+	bbox_rect := bbox + _PAD * 2
+	text_pos := pos + _PAD
 
 	hover := point_within_rect(mouse_pos, pos, bbox_rect)
 	pressed := hover && platform.mouse_is_down(.Left) // its just for rendering. in logic wise, button must fire when release
@@ -45,22 +158,7 @@ draw_button_flat_dark :: proc(font: Font, text: string, pos: [2]f32, font_size: 
 
 	return hover && platform.mouse_is_released(.Left)
 }
-
-ui_to_test :: proc(font: Font) {
-	@(static) did := false
-
-	if draw_button_flat_dark(font, "Continue", {100, 40}, 18) {
-		did = !did
-	}
-
-	if did {
-		draw_button_flat_dark(font, "Press", {100, 80}, 18)
-		draw_button_flat_dark(font, "Handling...", {100, 120}, 18)
-	}
-
-	draw_button_flat_dark(font, "Yer Seviyesi", {100, 160}, 18)
-	draw_button_flat_dark(font, "Basma Bana", {100, 200}, 18)
-}
+*/
 
 /*
 draw_button_gradient_vertical :: proc(font: Font, text: string, pos: [2]f32, font_size: f32) {
