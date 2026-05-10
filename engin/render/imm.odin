@@ -311,7 +311,7 @@ _set_current_texture :: proc(handle: u32) {
 @(private = "file")
 _imm_state_init :: proc() -> bool {
 	{
-		err := virtual.arena_init_static(&_arena, commit_size = mem.Kilobyte * 16)
+		err := virtual.arena_init_static(&_arena, commit_size = mem.Kilobyte * 8)
 		if err != .None {
 			fmt.eprintfln("[ERROR] Arena init failed, %v", err)
 			return false
