@@ -48,7 +48,7 @@ window_set_focus :: proc() {
 	windows.SetFocus(_hwnd)
 }
 
-// TODO:
+// TODO: check??
 window_minimize :: proc() {windows.ShowWindow(_hwnd, windows.SW_MINIMIZE)}
 window_maximize :: proc() {windows.ShowWindow(_hwnd, windows.SW_MAXIMIZE)}
 window_restore :: proc() {windows.ShowWindow(_hwnd, windows.SW_RESTORE)}

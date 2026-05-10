@@ -4,12 +4,7 @@ package win32
 import "base:runtime"
 import "core:sys/windows"
 
-/*
-*
-*/
-
 display_settings: windows.DEVMODEW
-
 @(private = "file", init)
 _display_settings_init :: proc "contextless" () {
 	windows.EnumDisplaySettingsW(nil, windows.ENUM_CURRENT_SETTINGS, &display_settings)
@@ -29,12 +24,7 @@ graphical_error :: proc(title, msg: string) {
 	windows.MessageBoxW(nil, msg16, title16, windows.MB_OK | windows.MB_ICONERROR)
 }
 
-/*
-*
-*/
-
 foreign import user32 "system:User32.lib"
-
 @(default_calling_convention = "system")
 foreign user32 {
 	GetCaretBlinkTime :: proc() -> windows.UINT ---

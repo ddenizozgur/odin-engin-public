@@ -191,6 +191,7 @@ _window_proc :: proc "system" (
 		keycode := _keycode_from_vkey(cast(u32)wparam)
 		keymode := _get_keymode()
 
+		// TODO: do we want this???
 		#partial switch keycode {
 		case .Ctrl:
 			keymode -= {.Ctrl}

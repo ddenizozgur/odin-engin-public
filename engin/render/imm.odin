@@ -270,15 +270,14 @@ _vao, _vbo: u32
 @(private = "file")
 _uber_shader: Shader
 @(private = "file")
-_data_list: [dynamic]Imm_Per_Data
-
-@(private = "file")
-_arena: virtual.Arena
-
-@(private = "file")
 _current_texture: Texture
 @(private = "file")
 _batch_has_texture: bool
+
+@(private = "file")
+_arena: virtual.Arena
+@(private = "file")
+_data_list: [dynamic]Imm_Per_Data
 
 @(private = "file")
 _UBER_VSHADER_SRC :: cast(string)#load("shader/uber-vshader.glsl")

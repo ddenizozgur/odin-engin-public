@@ -163,22 +163,20 @@ Mouse_Button :: enum {
 	XButton2,
 }
 
-/*
-*
-*/
-
 Key_State :: enum {
 	Pressed,
 	Released,
 }
 
-// TODO: change repeat??
+//
+// Per Frame EventList
+//
 Event_Key :: struct {
 	code:         Key_Code,
 	mode:         Key_Mode_Flags,
 	state:        Key_State,
 	is_repeat:    bool,
-	repeat_count: int, // TODO: it must be zero while release
+	repeat_count: int,	// TODO: change repeat??
 }
 Event_Text :: distinct rune
 
@@ -212,10 +210,9 @@ Event :: union {
 
 events_this_frame: [dynamic]Event
 
-/*
-*
-*/
-
+//
+// Per Frame State
+//
 _mouse_btns_prev_frame: [Mouse_Button]bool
 _mouse_btns_this_frame: [Mouse_Button]bool
 
