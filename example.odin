@@ -46,9 +46,10 @@ to_update :: proc(dt: f32) -> bool {
 
 		// torture_test_liquid_neon(font, et)
 
-		render.ui_to_test(font)
+		// render.ui_to_test(font)
 
-		// draw_some_text(font, {0, 0}, 1, render.RAYWHITE)
+		// draw_some_text(font, {0, 0}, math.sin_f32(et) * 0.5 + 1, render.RAYWHITE)
+		draw_some_text(font, {0, 0}, 1, render.RAYWHITE)
 
 		draw_fps(font, {client_size.x, 0}, 20, dt, .TopRight)
 	}
@@ -136,11 +137,12 @@ draw_some_text :: proc(font: render.Font, pos: [2]f32, scale: f32, color: render
 		defer y += line_h
 
 		{
-			runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
+			// runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 
 			render.imm_push_text(
 				font,
 				"The quick brown fox jumps over the lazy dog",
+				// fmt.tprintf("The quick brown fox jumps over the lazy dog, %v", font_size),
 				{pos.x, y},
 				font_size,
 				color,

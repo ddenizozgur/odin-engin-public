@@ -91,7 +91,7 @@ texture_load_from_file :: proc(
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 
 	img, err := image.load_from_file(filepath, allocator = context.temp_allocator)
-	if err != nil {
+	if err != image.General_Image_Error.None {
 		fmt.eprintfln("[ERROR]: %v", err)
 		return {}, false
 	}
@@ -151,7 +151,3 @@ _texture_format_from_channels :: proc(channels: int) -> (Texture_Format, bool) {
 	assert(false, "unsupported channel count")
 	return .RGBA8, false
 }
-
-/*
-*
-*/

@@ -2,19 +2,12 @@ package render
 
 import "../platform"
 import "../platform/win32"
+import "base:runtime"
+import "core:fmt"
 import "core:math/linalg"
+import "core:mem"
+import "core:mem/virtual"
 import "core:sys/windows"
-
-point_within_rect :: proc(p: [2]f32, pos, size: [2]f32) -> bool {
-	if p.x > pos.x && p.y > pos.y {
-		br := pos + size
-		if p.x < br.x && p.y < br.y {
-			return true
-		}
-		return false
-	}
-	return false
-}
 
 _UI_Widget_Flags :: enum {
 	Clickable,
@@ -29,11 +22,55 @@ _UI_Widget_Flags :: enum {
 }
 UI_Widget_Flags :: bit_set[_UI_Widget_Flags]
 
-UI_Action :: struct {
-	hovered: bool,
-	clicked: bool,
+UI_Size_Kind :: enum {
+	Custom,
+	TextContent,
+	ParentPercent,
+	ChildrenSum,
 }
 
+UI_Widget :: struct {
+	//
+	parent:       ^UI_Widget,
+	first_child:  ^UI_Widget,
+	last_child:   ^UI_Widget,
+	next_sibling: ^UI_Widget,
+	prev_sibling: ^UI_Widget,
+	//
+	flags:        UI_Widget_Flags,
+	text:         string,
+	size_kind:    UI_Size_Kind,
+	// Calc per frame
+	calc_rel_pos: [2]f32,
+	calc_size:    [2]f32,
+}
+
+@(private = "file")
+_widget_list: [dynamic]UI_Widget
+
+@(private = "file")
+_arena: virtual.Arena
+
+_widget_state_init :: proc(loc := #caller_location) {
+	err := virtual.arena_init_static(&_arena, commit_size = mem.Kilobyte * 8)
+	if err != .None {
+		fmt.eprintfln("[ERROR] Arena init failed, %v, %v", err, loc)
+		return
+	}
+	allocator := virtual.arena_allocator(&_arena)
+	_widget_list = make([dynamic]UI_Widget, allocator = allocator)
+}
+
+
+_UI_Action :: enum {
+	Hovered,
+	Clicked,
+	// DoubleClicked,
+}
+UI_Action :: bit_set[_UI_Action]
+
+
+/*
 ui_widget_base :: proc(text: string, pos: [2]f32, flags: UI_Widget_Flags) -> UI_Action {
 	bbox := text_bbox(_font, text, _font_size)
 	mouse_pos := cast([2]f32)win32.get_mouse_pos()
@@ -44,6 +81,12 @@ ui_widget_base :: proc(text: string, pos: [2]f32, flags: UI_Widget_Flags) -> UI_
 	hovered := point_within_rect(mouse_pos, pos, bbox_rect)
 	pressed := hovered && platform.mouse_is_down(.Left)
 	clicked := hovered && platform.mouse_is_released(.Left)
+
+	action: UI_Action
+	if hovered do action += {.Hovered}
+	if (.Clickable in flags) && clicked {
+		action += {.Clicked}
+	}
 
 	if .DrawBackground in flags {
 		tcol := _DARK_GRAY
@@ -69,7 +112,7 @@ ui_widget_base :: proc(text: string, pos: [2]f32, flags: UI_Widget_Flags) -> UI_
 		imm_push_text(_font, text, text_pos, _font_size, _ALMOST_WHITE)
 	}
 
-	return {hovered = hovered, clicked = .Clickable in flags ? clicked : false}
+	return action
 }
 
 ui_button :: #force_inline proc(text: string, pos: [2]f32) -> UI_Action {
@@ -92,10 +135,6 @@ UI_FRAME_SCOPED :: #force_inline proc(font: Font) {
 	ui_begin_frame(font)
 }
 
-/*
-*
-*/
-
 _ROUNDNESS :: 6
 _PADDING :: [2]f32{6, 2}
 
@@ -107,16 +146,11 @@ _ALMOST_WHITE :: RGBA32{245, 245, 245, 255}
 _font: Font
 _font_size := f32(18)
 
-_idle_bg_col := _DARK_GRAY
-_pressed_bg_col := _DARKER_GRAY
-_hover_bg_top_col := _LIGHT_GRAY
-_hover_bg_btm_col := _DARK_GRAY
-
 ui_to_test :: proc(font: Font) {
 	UI_FRAME_SCOPED(font)
 
 	@(static) did := false
-	if ui_button("Continue", {100, 40}).clicked {
+	if .Clicked in ui_button("Continue", {100, 40}) {
 		did = !did
 	}
 
@@ -128,6 +162,8 @@ ui_to_test :: proc(font: Font) {
 	ui_panel("Yer Seviyesi", {100, 160})
 	ui_button("Basma Bana", {100, 200})
 }
+*/
+
 
 /*
 *

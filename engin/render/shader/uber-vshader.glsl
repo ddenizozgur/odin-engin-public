@@ -23,8 +23,20 @@ flat out int v_shader_kind;
 uniform mat4 u_proj_ortho;
 
 void main() {
-  vec2 verts[4] = vec2[](vec2(-1.0, -1.0), vec2(1.0, -1.0), vec2(-1.0, 1.0), vec2(1.0, 1.0));
-  vec4 colors[4] = vec4[](a_color_tl, a_color_tr, a_color_bl, a_color_br);
+  vec2 verts[4] =
+    vec2[](
+      vec2(-1, -1),
+      vec2(1, -1),
+      vec2(-1, 1),
+      vec2(1, 1)
+    );
+  vec4 colors[4] =
+    vec4[](
+      a_color_tl,
+      a_color_tr,
+      a_color_bl,
+      a_color_br
+    );
 
   vec4 local_color = colors[gl_VertexID];
   vec2 local_vert = verts[gl_VertexID];

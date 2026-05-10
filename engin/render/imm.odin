@@ -1,14 +1,14 @@
 package render
 
+import "base:runtime"
+import "core:fmt"
 import "core:math/linalg"
+import "core:mem"
+import "core:mem/virtual"
 import "core:sys/windows"
 import "vendor:OpenGL"
 
 import "../platform/win32"
-
-/*
-*
-*/
 
 // TODO: flush when exceed 1MiB
 Imm_Per_Data :: struct {
@@ -28,13 +28,12 @@ Imm_Per_Data :: struct {
 	},
 }
 
-imm_begin_frame :: proc(allocator := context.allocator) -> bool {
+imm_begin_frame :: proc() -> bool {
 	@(static) initted: bool
 	if !initted {
-		_init_state(allocator) or_return
+		_imm_state_init() or_return
 		initted = true
 	}
-
 	set_target_to_default()
 	return true
 }
@@ -47,8 +46,8 @@ imm_end_frame :: proc() {
 }
 
 @(deferred_out = imm_end_frame)
-IMM_FRAME_SCOPED :: #force_inline proc(allocator := context.allocator) {
-	imm_begin_frame(allocator = allocator)
+IMM_FRAME_SCOPED :: #force_inline proc() {
+	imm_begin_frame()
 }
 
 /*
@@ -63,7 +62,7 @@ imm_push_rect_grad :: proc(
 	append(
 		&_data_list,
 		Imm_Per_Data {
-			src = {0.0, 0.0, 1.0, 1.0},
+			src = {0, 0, 1, 1},
 			dst = {pos.x, pos.y, pos.x + size.x, pos.y + size.y},
 			color_tl = color_tl,
 			color_tr = color_tr,
@@ -274,14 +273,17 @@ _uber_shader: Shader
 _data_list: [dynamic]Imm_Per_Data
 
 @(private = "file")
+_arena: virtual.Arena
+
+@(private = "file")
 _current_texture: Texture
 @(private = "file")
 _batch_has_texture: bool
 
 @(private = "file")
-_UBER_VSHADER_SRC :: cast(string)#load("shader-src/uber-vshader.glsl")
+_UBER_VSHADER_SRC :: cast(string)#load("shader/uber-vshader.glsl")
 @(private = "file")
-_UBER_FSHADER_SRC :: cast(string)#load("shader-src/uber-fshader.glsl")
+_UBER_FSHADER_SRC :: cast(string)#load("shader/uber-fshader.glsl")
 
 @(private = "file")
 _uber_shader_attrib_layout: []Shader_Attrib_Layout = {
@@ -307,22 +309,39 @@ _set_current_texture :: proc(handle: u32) {
 }
 
 @(private = "file")
-_init_state :: proc(allocator := context.allocator) -> bool {
-	_data_list = make([dynamic]Imm_Per_Data, allocator = allocator)
+_imm_state_init :: proc() -> bool {
+	{
+		err := virtual.arena_init_static(&_arena, commit_size = mem.Kilobyte * 16)
+		if err != .None {
+			fmt.eprintfln("[ERROR] Arena init failed, %v", err)
+			return false
+		}
+		allocator := virtual.arena_allocator(&_arena)
+		_data_list = make([dynamic]Imm_Per_Data, allocator = allocator)
 
-	_uber_shader = shader_init(_UBER_VSHADER_SRC, _UBER_FSHADER_SRC) or_return
+		_uber_shader = shader_init(_UBER_VSHADER_SRC, _UBER_FSHADER_SRC) or_return
+	}
 
-	OpenGL.GenVertexArrays(1, &_vao)
-	OpenGL.BindVertexArray(_vao)
-	OpenGL.GenBuffers(1, &_vbo)
-	OpenGL.BindBuffer(OpenGL.ARRAY_BUFFER, _vbo)
+	{
+		OpenGL.GenVertexArrays(1, &_vao)
+		OpenGL.BindVertexArray(_vao)
+		OpenGL.GenBuffers(1, &_vbo)
+		OpenGL.BindBuffer(OpenGL.ARRAY_BUFFER, _vbo)
+		_shader_bind_layout(
+			_uber_shader,
+			size_of(Imm_Per_Data),
+			_uber_shader_attrib_layout,
+		) or_return
+	}
 
-	return _shader_bind_layout(_uber_shader, size_of(Imm_Per_Data), _uber_shader_attrib_layout)
+	return true
 }
 
 @(private = "file")
 _flush :: proc() -> bool {
-	if len(_data_list) == 0 do return true
+	if len(_data_list) == 0 {
+		return true
+	}
 
 	defer {
 		clear(&_data_list)
@@ -415,7 +434,3 @@ _shader_bind_layout :: proc(shader: Shader, stride: i32, layout: []Shader_Attrib
 
 	return true
 }
-
-/*
-*
-*/

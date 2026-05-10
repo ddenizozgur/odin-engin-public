@@ -103,8 +103,8 @@ msdf_load_from_memory :: proc(
 		y_flip := msdf_data.atlas.yOrigin == "top"
 
 		font.atlas = texture_load_from_image(img) or_return
-		font.atlas.size.x = cast(int)msdf_data.atlas.width
-		font.atlas.size.y = cast(int)msdf_data.atlas.height
+		// font.atlas.size.x = cast(int)msdf_data.atlas.width
+		// font.atlas.size.y = cast(int)msdf_data.atlas.height
 		font.metrics = msdf_data.metrics
 
 		font.glyphs = make(map[rune]Glyph, allocator = final_alloc)
@@ -156,13 +156,13 @@ msdf_load_from_file :: proc(
 		bool,
 	) {
 		json_data, json_err := os.read_entire_file(json_path, allocator = temp_alloc)
-		if json_err != nil {
+		if json_err != os.General_Error.None {
 			fmt.eprintfln("[ERROR] Failed to read font JSON: %v", json_path)
 			return {}, false
 		}
 
 		img, img_err := image.load_from_file(img_path, allocator = temp_alloc)
-		if img_err != nil {
+		if img_err != image.General_Image_Error.None {
 			fmt.eprintfln("[ERROR] image.load_from_file(): %v", img_err)
 			return {}, false
 		}
@@ -248,7 +248,7 @@ msdf_atlas_gen :: proc(
 		}
 
 		process, start_err := os.process_start(desc)
-		if start_err != nil {
+		if start_err != os.General_Error.None {
 			fmt.eprintfln(
 				"[ERROR] Failed to start generator. Is '%s' in your PATH? Error: %v",
 				MSDF_ATLAS_GEN_EXEC_PATH,
@@ -259,7 +259,7 @@ msdf_atlas_gen :: proc(
 		defer _ = os.process_terminate(process) // TODO: check
 
 		state, wait_err := os.process_wait(process)
-		if wait_err != nil || !state.success {
+		if wait_err != os.General_Error.None || !state.success {
 			fmt.eprintfln("[ERROR] %s failed or exited with an error.", MSDF_ATLAS_GEN_EXEC_PATH)
 			return "", "", false
 		}
@@ -275,7 +275,3 @@ msdf_atlas_gen :: proc(
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 	return inner(ttf_path, context.temp_allocator, allocator)
 }
-
-/*
-*
-*/

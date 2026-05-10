@@ -125,3 +125,14 @@ pos_from_align_kind :: proc(pos, size: [2]f32, align: Align_Kind) -> [2]f32 {
 
 	return real_pos
 }
+
+point_within_rect :: proc(p: [2]f32, pos, size: [2]f32) -> bool {
+	if p.x > pos.x && p.y > pos.y {
+		br := pos + size
+		if p.x < br.x && p.y < br.y {
+			return true
+		}
+		return false
+	}
+	return false
+}
