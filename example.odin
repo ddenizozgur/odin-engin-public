@@ -35,8 +35,8 @@ to_update :: proc(dt: f32) -> bool {
 	@(static) et: f32
 	defer et += dt
 
-	client_size := linalg.to_f32(win32.get_client_size())
-	mouse_pos := linalg.to_f32(win32.get_mouse_pos())
+	client_size := cast([2]f32)win32.get_client_size()
+	mouse_pos := cast([2]f32)win32.get_mouse_pos()
 
 	{
 		render.IMM_FRAME_SCOPED()
@@ -151,7 +151,7 @@ draw_some_text :: proc(font: render.Font, pos: [2]f32, scale: f32, color: render
 }
 
 aurora_bg :: proc(et: f32) {
-	client := linalg.to_f32(win32.get_client_size())
+	client := cast([2]f32)win32.get_client_size()
 
 	s1 := math.sin_f32(et * 0.15)
 	s2 := math.cos_f32(et * 0.22)
@@ -174,7 +174,7 @@ aurora_bg :: proc(et: f32) {
 }
 
 torture_test_liquid_neon :: proc(font: render.Font, et: f32) {
-	client_size := linalg.to_f32(win32.get_client_size())
+	client_size := cast([2]f32)win32.get_client_size()
 
 	cols := 40
 	rows := 25

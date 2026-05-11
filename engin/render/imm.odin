@@ -280,9 +280,9 @@ _arena: virtual.Arena
 _data_list: [dynamic]Imm_Per_Data
 
 @(private = "file")
-_UBER_VSHADER_SRC :: cast(string)#load("shader/uber-vshader.glsl")
+_UBER_VSHADER_SRC :: cast(string)#load("shaders/imm-uber-vshader.glsl")
 @(private = "file")
-_UBER_FSHADER_SRC :: cast(string)#load("shader/uber-fshader.glsl")
+_UBER_FSHADER_SRC :: cast(string)#load("shaders/imm-uber-fshader.glsl")
 
 @(private = "file")
 _uber_shader_attrib_layout: []Shader_Attrib_Layout = {
