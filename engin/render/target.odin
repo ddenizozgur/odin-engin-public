@@ -1,6 +1,6 @@
 package render
 
-import "../platform/win32"
+import "../platform"
 import "vendor:OpenGL"
 
 /*
@@ -8,7 +8,7 @@ import "vendor:OpenGL"
 */
 
 resize_default_target :: proc() {
-	client_size := win32.get_client_size()
+	client_size := platform.get_client_size()
 	OpenGL.Viewport(0, 0, client_size.x, client_size.y)
 }
 
@@ -21,7 +21,7 @@ clear_target :: proc(color: RGBA32) {
 }
 
 set_target_to_default :: proc() {
-	client_size := win32.get_client_size()
+	client_size := platform.get_client_size()
 	OpenGL.Viewport(0, 0, client_size.x, client_size.y)
 
 	OpenGL.BindFramebuffer(OpenGL.FRAMEBUFFER, 0)

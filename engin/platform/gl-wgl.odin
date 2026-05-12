@@ -1,16 +1,36 @@
 #+build windows
-package win32
+package platform
 
 import "core:sys/windows"
-import "vendor:OpenGL"
 
-wgl_init :: proc() -> bool {
+@(private) // TODO
+_gl_swap_interval :: #force_inline proc(interval: i32) -> bool {
+	return cast(bool)windows.SwapInterval(_hwnd, interval)
+}
+
+@(private)
+_gl_swap_buffers :: #force_inline proc() {
+	windows.SwapBuffers(_hdc)
+}
+
+@(private)
+_gl_load :: proc() -> bool {
+	_wgl_load() or_return
+	OpenGL.load_up_to(GL_VERSION_MAJOR, GL_VERSION_MINOR, windows.gl_set_proc_address)
+	return true
+}
+
+//
+// Private
+//
+@(private = "file")
+_wgl_load :: proc() -> bool {
 	if _hwnd == nil {
-		assert(false, "call win32.window_init() first")
+		assert(false, "call window_init() first")
 		return false
 	}
 
-	_wgl_init0() or_return
+	_wgl_load0() or_return
 
 	pf: i32 = 0
 	pf_count: u32 = 0
@@ -36,10 +56,10 @@ wgl_init :: proc() -> bool {
 		4,
 		0,
 	}
-	pf_ok := windows.wglChoosePixelFormatARB(_hdc, raw_data(pf_attribs), nil, 1, &pf, &pf_count)
+	pf_good := windows.wglChoosePixelFormatARB(_hdc, raw_data(pf_attribs), nil, 1, &pf, &pf_count)
 
 	// fallback for MSAA
-	if !pf_ok || pf_count == 0 {
+	if !pf_good || pf_count == 0 {
 		pf_attribs_no_msaa := []i32 {
 			windows.WGL_DRAW_TO_WINDOW_ARB,
 			1,
@@ -58,7 +78,7 @@ wgl_init :: proc() -> bool {
 			0,
 		}
 
-		pf_ok = windows.wglChoosePixelFormatARB(
+		pf_good = windows.wglChoosePixelFormatARB(
 			_hdc,
 			raw_data(pf_attribs_no_msaa),
 			nil,
@@ -67,8 +87,8 @@ wgl_init :: proc() -> bool {
 			&pf_count,
 		)
 
-		if !pf_ok || pf_count == 0 {
-			assert(false, "wglChoosePixelFormatARB(): failed")
+		if !pf_good || pf_count == 0 {
+			fmt.eprintln("[ERROR] Failed to choose pixel format")
 			return false
 		}
 	}
@@ -76,34 +96,30 @@ wgl_init :: proc() -> bool {
 	dummy_pfd: windows.PIXELFORMATDESCRIPTOR
 	windows.DescribePixelFormat(_hdc, pf, size_of(dummy_pfd), &dummy_pfd)
 	if !windows.SetPixelFormat(_hdc, pf, &dummy_pfd) {
-		assert(false, "SetPixelFormat(): failed")
+		fmt.eprintln("[ERROR] SetPixelFormat(): failed")
 		return false
 	}
-	// if !windows.SetPixelFormat(_window_state.hdc, pf, nil) { 	// TODO: check
-	// 	assert(false, "SetPixelFormat(): failed")
-	// 	return false
-	// }
 
 	context_attribs := []i32 {
 		windows.WGL_CONTEXT_MAJOR_VERSION_ARB,
-		4,
+		GL_VERSION_MAJOR,
 		windows.WGL_CONTEXT_MINOR_VERSION_ARB,
-		3,
+		GL_VERSION_MINOR,
 		windows.WGL_CONTEXT_PROFILE_MASK_ARB,
 		windows.WGL_CONTEXT_CORE_PROFILE_BIT_ARB,
 		windows.WGL_CONTEXT_FLAGS_ARB,
-		cast(i32)ODIN_DEBUG * windows.WGL_CONTEXT_DEBUG_BIT_ARB,
+		ODIN_DEBUG ? windows.WGL_CONTEXT_DEBUG_BIT_ARB : 0,
 		0,
 	}
 
 	hglrc := windows.wglCreateContextAttribsARB(_hdc, nil, raw_data(context_attribs))
 	if hglrc == nil {
-		assert(false, "wglCreateContextAttribsARB(): failed")
+		fmt.eprintln("[ERROR] wglCreateContextAttribsARB(): failed")
 		return false
 	}
 
 	if !windows.wglMakeCurrent(_hdc, hglrc) {
-		assert(false, "wglMakeCurrent(): failed")
+		fmt.eprintln("[ERROR] wglMakeCurrent(): failed")
 		windows.wglDeleteContext(hglrc)
 		return false
 	}
@@ -112,7 +128,7 @@ wgl_init :: proc() -> bool {
 }
 
 @(private = "file")
-_wgl_init0 :: proc() -> bool {
+_wgl_load0 :: proc() -> bool {
 	hinst := cast(windows.HINSTANCE)windows.GetModuleHandleW(nil)
 
 	wnd_class: windows.WNDCLASSW = {
@@ -121,7 +137,7 @@ _wgl_init0 :: proc() -> bool {
 		lpszClassName = "dummy-wnd-class-name",
 	}
 	if windows.RegisterClassW(&wnd_class) == 0 {
-		assert(false, "RegisterClassW(): failed")
+		fmt.eprintln("[ERROR] RegisterClassW(): failed")
 		return false
 	}
 	defer windows.UnregisterClassW(wnd_class.lpszClassName, hinst)
@@ -141,7 +157,7 @@ _wgl_init0 :: proc() -> bool {
 		nil,
 	)
 	if hwnd == nil {
-		assert(false, "CreateWindowExW(): failed")
+		fmt.eprintln("[ERROR] CreateWindowExW(): failed")
 		return false
 	}
 	defer windows.DestroyWindow(hwnd)
@@ -161,25 +177,25 @@ _wgl_init0 :: proc() -> bool {
 	}
 	pf := windows.ChoosePixelFormat(hdc, &pfd)
 	if pf == 0 {
-		assert(false, "ChoosePixelFormat(): failed")
+		fmt.eprintln(false, "ChoosePixelFormat(): failed")
 		return false
 	}
 	if windows.DescribePixelFormat(hdc, pf, size_of(pfd), &pfd) == 0 {
-		assert(false, "DescribePixelFormat(): failed")
+		fmt.eprintln(false, "DescribePixelFormat(): failed")
 		return false
 	}
 	if !windows.SetPixelFormat(hdc, pf, &pfd) {
-		assert(false, "SetPixelFormat(): failed")
+		fmt.eprintln(false, "SetPixelFormat(): failed")
 		return false
 	}
 
 	hglrc := windows.wglCreateContext(hdc)
 	if hglrc == nil {
-		assert(false, "wglCreateContext(): failed")
+		fmt.eprintln(false, "wglCreateContext(): failed")
 		return false
 	}
 	if !windows.wglMakeCurrent(hdc, hglrc) {
-		assert(false, "wglMakeCurrent(): failed")
+		fmt.eprintln(false, "wglMakeCurrent(): failed")
 		return false
 	}
 	defer {

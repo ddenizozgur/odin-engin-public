@@ -1,19 +1,13 @@
 #+build windows
-package win32
+package platform
 
-import "../../platform"
+import "core:unicode/utf16"
 import "base:runtime"
 import "core:sys/windows"
 
 // TODO: blocking version
-poll_events_this_frame :: proc() {
-	for btn in platform.Mouse_Button {
-		btn_this_frame := platform._mouse_btns_this_frame[btn]
-		platform._mouse_btns_prev_frame[btn] = btn_this_frame
-	}
-
-	clear(&platform.events_this_frame)
-
+@(private)
+_poll_events_this_frame :: proc() {
 	msg: windows.MSG
 	for windows.PeekMessageW(&msg, nil, 0, 0, windows.PM_REMOVE) {
 		windows.TranslateMessage(&msg)
@@ -21,22 +15,9 @@ poll_events_this_frame :: proc() {
 	}
 }
 
-// get_mouse_source :: proc() -> platform.Mouse_Source {
-// 	signature := windows.GetMessageExtraInfo() & 0xFFFFFF80
-// 	if signature == 0xFF515700 do return .Pen
-// 	if signature == 0xFF515780 do return .TouchScreen
-// 	return .Mouse
-// }
-
-/*
-*
-*/
-
-// const bool swapped = (TRUE == GetSystemMetrics(SM_SWAPBUTTON));
-// TODO: check for swapped mouse buttons???
-@(private = "file")
-_MOUSE_SCROLL_NORMVAL :: f32(120)
-
+//
+// Privates
+//
 @(private)
 _window_proc :: proc "system" (
 	hwnd: windows.HWND,
@@ -51,22 +32,22 @@ _window_proc :: proc "system" (
 	switch msg {
 	// case windows.WM_DESTROY:
 	case windows.WM_CLOSE:
-		append(&platform.events_this_frame, platform.Event_Window_Close{})
+		append(&events_this_frame, Event_Window_Close{})
 
 	case windows.WM_SIZE:
 		switch wparam {
 		case windows.SIZE_MINIMIZED:
-			append(&platform.events_this_frame, platform.Event_Window_Minimize{})
+			append(&events_this_frame, Event_Window_Minimize{})
 		case windows.SIZE_MAXIMIZED:
-			append(&platform.events_this_frame, platform.Event_Window_Maximize{})
-		// case windows.SIZE_RESTORED:
-		// 	append(&platform.events_this_frame, platform.Event_Window_Restore{})
+			append(&events_this_frame, Event_Window_Maximize{})
+		case windows.SIZE_RESTORED:
+			append(&events_this_frame, Event_Window_Restore{})
 		}
 
 	case windows.WM_SETFOCUS:
-		append(&platform.events_this_frame, platform.Event_Window_Focus{})
+		append(&events_this_frame, Event_Window_Focus{})
 	case windows.WM_KILLFOCUS:
-		append(&platform.events_this_frame, platform.Event_Window_UnFocus{})
+		append(&events_this_frame, Event_Window_UnFocus{})
 	// TODO: ??? windows.ReleaseCapture()
 
 	case windows.WM_INPUT: // TODO: rawinput
@@ -80,62 +61,62 @@ _window_proc :: proc "system" (
 	case windows.WM_LBUTTONUP:
 		windows.ReleaseCapture()
 
-		btn := platform.Mouse_Button.Left
-		platform._mouse_btns_this_frame[btn] = false
+		btn := Mouse_Button.Left
+		_mouse_btns_this_frame[btn] = false
 
 		append(
-			&platform.events_this_frame,
-			platform.Event_Mouse_Button{state = .Released, button = btn},
+			&events_this_frame,
+			Event_Mouse_Button{state = .Released, button = btn},
 		)
 	case windows.WM_LBUTTONDOWN:
 		windows.SetCapture(hwnd)
 
-		btn := platform.Mouse_Button.Left
-		platform._mouse_btns_this_frame[btn] = true
+		btn := Mouse_Button.Left
+		_mouse_btns_this_frame[btn] = true
 
 		append(
-			&platform.events_this_frame,
-			platform.Event_Mouse_Button{state = .Pressed, button = btn},
+			&events_this_frame,
+			Event_Mouse_Button{state = .Pressed, button = btn},
 		)
 	case windows.WM_MBUTTONUP:
 		windows.ReleaseCapture()
 
-		btn := platform.Mouse_Button.Middle
-		platform._mouse_btns_this_frame[btn] = false
+		btn := Mouse_Button.Middle
+		_mouse_btns_this_frame[btn] = false
 
 		append(
-			&platform.events_this_frame,
-			platform.Event_Mouse_Button{state = .Released, button = btn},
+			&events_this_frame,
+			Event_Mouse_Button{state = .Released, button = btn},
 		)
 	case windows.WM_MBUTTONDOWN:
 		windows.SetCapture(hwnd)
 
-		btn := platform.Mouse_Button.Middle
-		platform._mouse_btns_this_frame[btn] = true
+		btn := Mouse_Button.Middle
+		_mouse_btns_this_frame[btn] = true
 
 		append(
-			&platform.events_this_frame,
-			platform.Event_Mouse_Button{state = .Pressed, button = btn},
+			&events_this_frame,
+			Event_Mouse_Button{state = .Pressed, button = btn},
 		)
 	case windows.WM_RBUTTONUP:
 		windows.ReleaseCapture()
 
-		btn := platform.Mouse_Button.Right
-		platform._mouse_btns_this_frame[btn] = false
+		btn := Mouse_Button.Right
+		_mouse_btns_this_frame[btn] = false
 
 		append(
-			&platform.events_this_frame,
-			platform.Event_Mouse_Button{state = .Released, button = btn},
+			&events_this_frame,
+			Event_Mouse_Button{state = .Released, button = btn},
 		)
 	case windows.WM_RBUTTONDOWN:
 		windows.SetCapture(hwnd)
 
-		btn := platform.Mouse_Button.Right
-		platform._mouse_btns_this_frame[btn] = true
+		btn := Mouse_Button.Right
+		_mouse_btns_this_frame[btn] = true
 
 		append(
-			&platform.events_this_frame,
-			platform.Event_Mouse_Button{state = .Pressed, button = btn},
+			&events_this_frame,
+			Event_Mouse_Button{state = .Pressed, button = btn},
 		)
 	case windows.WM_XBUTTONUP:
 		windows.ReleaseCapture()
@@ -143,41 +124,41 @@ _window_proc :: proc "system" (
 		// Unlike the WM_LBUTTONDOWN, WM_MBUTTONDOWN, and WM_RBUTTONDOWN messages,
 		// an application should return TRUE from this message if it processes it
 		defer result = 1
-		btn: platform.Mouse_Button = windows.HIWORD(wparam) == 1 ? .XButton1 : .XButton2
-		platform._mouse_btns_this_frame[btn] = false
+		btn: Mouse_Button = windows.HIWORD(wparam) == 1 ? .XButton1 : .XButton2
+		_mouse_btns_this_frame[btn] = false
 
 		append(
-			&platform.events_this_frame,
-			platform.Event_Mouse_Button{state = .Released, button = btn},
+			&events_this_frame,
+			Event_Mouse_Button{state = .Released, button = btn},
 		)
 	case windows.WM_XBUTTONDOWN:
 		windows.SetCapture(hwnd)
 
 		defer result = 1
-		btn: platform.Mouse_Button = windows.HIWORD(wparam) == 1 ? .XButton1 : .XButton2
-		platform._mouse_btns_this_frame[btn] = true
+		btn: Mouse_Button = windows.HIWORD(wparam) == 1 ? .XButton1 : .XButton2
+		_mouse_btns_this_frame[btn] = true
 
 		append(
-			&platform.events_this_frame,
-			platform.Event_Mouse_Button{state = .Pressed, button = btn},
+			&events_this_frame,
+			Event_Mouse_Button{state = .Pressed, button = btn},
 		)
 
 	case windows.WM_MOUSEMOVE:
 		x := windows.GET_X_LPARAM(lparam)
 		y := windows.GET_Y_LPARAM(lparam)
-		append(&platform.events_this_frame, platform.Event_Mouse_Move{x, y})
+		append(&events_this_frame, Event_Mouse_Move{x, y})
 
 	case windows.WM_MOUSEWHEEL:
-		norm_delta_vert := cast(f32)windows.GET_WHEEL_DELTA_WPARAM(wparam) / _MOUSE_SCROLL_NORMVAL // TODO: check sign
-		append(&platform.events_this_frame, platform.Event_Mouse_Scroll{0., norm_delta_vert})
+		vert_scroll := cast(f32)windows.GET_WHEEL_DELTA_WPARAM(wparam) / _MOUSE_SCROLL_NORMVAL // TODO: check sign
+		append(&events_this_frame, Event_Mouse_Scroll{0., vert_scroll})
 	case windows.WM_MOUSEHWHEEL:
-		norm_delta_horz := cast(f32)windows.GET_WHEEL_DELTA_WPARAM(wparam) / _MOUSE_SCROLL_NORMVAL // TODO: check sign
-		append(&platform.events_this_frame, platform.Event_Mouse_Scroll{norm_delta_horz, 0.})
+		horz_scroll := cast(f32)windows.GET_WHEEL_DELTA_WPARAM(wparam) / _MOUSE_SCROLL_NORMVAL // TODO: check sign
+		append(&events_this_frame, Event_Mouse_Scroll{horz_scroll, 0.})
 
 	case windows.WM_SYSKEYUP, windows.WM_SYSKEYDOWN:
 		if wparam == windows.VK_F4 {
 			// return windows.DefWindowProcW(hwnd, msg, wparam, lparam)
-			append(&platform.events_this_frame, platform.Event_Window_Close{})
+			append(&events_this_frame, Event_Window_Close{})
 			break
 		}
 		if wparam != windows.VK_MENU && (wparam < windows.VK_F1 || wparam > windows.VK_F24) {
@@ -189,72 +170,65 @@ _window_proc :: proc "system" (
 		is_down := (lparam & (1 << 31)) == 0
 
 		keycode := _keycode_from_vkey(cast(u32)wparam)
-		keymode := _get_keymode()
+		keymod := _get_keymod()
 
 		// TODO: do we want this???
 		#partial switch keycode {
 		case .Ctrl:
-			keymode -= {.Ctrl}
+			keymod -= {.Ctrl}
 		case .Shift:
-			keymode -= {.Shift}
+			keymod -= {.Shift}
 		case .Alt:
-			keymode -= {.Alt}
-		// case .Super: keymode -= {.Super}
+			keymod -= {.Alt}
+		case .Super:
+			keymod -= {.Super}
 		case .CapsLock:
-			keymode -= {.CapsLock}
+			keymod -= {.CapsLock}
 		case .NumLock:
-			keymode -= {.NumLock}
+			keymod -= {.NumLock}
 		}
 
 		append(
-			&platform.events_this_frame,
-			platform.Event_Key {
+			&events_this_frame,
+			Event_Key {
 				code = keycode,
-				mode = keymode,
+				mod = keymod,
 				state = is_down ? .Pressed : .Released,
-				is_repeat = is_down && was_down,
-				repeat_count = is_down ? lparam & 0xffff : 0,
+				// is_repeat = is_down && was_down,
+				// repeat_count = is_down ? lparam & 0xffff : 0,
 			},
 		)
 
 	case windows.WM_SYSCHAR:
 		result = windows.DefWindowProcW(hwnd, msg, wparam, lparam)
-	// TODO: fallthrough???
 	case windows.WM_CHAR:
 		// TODO: check
-		HIGH_SURROGATE_START :: 0xd800
-		HIGH_SURROGATE_END :: 0xdbff
-		LOW_SURROGATE_START :: 0xdc00
-		LOW_SURROGATE_END :: 0xdfff
+		@(static) high_surrogate: rune
+    w := cast(rune)wparam
 
-		@(static) high_surrogate: u16 = 0
-		w := cast(u16)wparam
+    codepoint: rune
+    if utf16.is_surrogate(w) {
+        if high_surrogate == 0 {
+            high_surrogate = w
+            break
+        } else {
+            codepoint = utf16.decode_surrogate_pair(high_surrogate, w)
+            high_surrogate = 0
 
-		if w >= HIGH_SURROGATE_START && w <= HIGH_SURROGATE_END {
-			high_surrogate = w
-		} else {
-			codepoint: rune
+            // broken/invalid
+            if codepoint == unicode.REPLACEMENT_CHAR {
+                break
+            }
+        }
+    } else {
+        codepoint = w
+        high_surrogate = 0
+    }
 
-			if w >= LOW_SURROGATE_START && w <= LOW_SURROGATE_END {
-				if high_surrogate != 0 {
-					codepoint = (cast(rune)high_surrogate - HIGH_SURROGATE_START) << 10
-					codepoint += (cast(rune)w - LOW_SURROGATE_START)
-					codepoint += 0x10000
-					high_surrogate = 0 // clear state after successful pair
-				} else {
-					// invalid sequence
-					break
-				}
-			} else {
-				codepoint = cast(rune)w
-				high_surrogate = 0 // clear state in case of a broken sequence
-			}
-
-			// control characters
-			if codepoint > 31 && codepoint != 127 {
-				append(&platform.events_this_frame, cast(platform.Event_Text)codepoint)
-			}
-		}
+    // Filter out ctrl chars
+    if unicode.is_print(codepoint) {
+        append(&events_this_frame, cast(Event_Text)codepoint)
+    }
 
 	case windows.WM_ERASEBKGND:
 		result = 1 // we fill out the client area so no need to erase the background
@@ -266,25 +240,37 @@ _window_proc :: proc "system" (
 	return result
 }
 
+// _get_mouse_source :: proc() -> Mouse_Source {
+// 	signature := windows.GetMessageExtraInfo() & 0xFFFFFF80
+// 	if signature == 0xFF515700 do return .Pen
+// 	if signature == 0xFF515780 do return .TouchScreen
+// 	return .Mouse
+// }
+
+// const bool swapped = (TRUE == GetSystemMetrics(SM_SWAPBUTTON));
+// TODO: check for swapped mouse buttons???
+
+
 @(private = "file")
-_get_keymode :: proc() -> platform.Key_Mode_Flags {
-	keymode: platform.Key_Mode_Flags
+_MOUSE_SCROLL_NORMVAL :: f32(120)
 
-	if cast(u16)windows.GetKeyState(windows.VK_SHIFT) & 0x8000 != 0 do keymode |= {.Shift}
-	if cast(u16)windows.GetKeyState(windows.VK_CONTROL) & 0x8000 != 0 do keymode |= {.Ctrl}
-	if cast(u16)windows.GetKeyState(windows.VK_MENU) & 0x8000 != 0 do keymode |= {.Alt}
-	if cast(u16)windows.GetKeyState(windows.VK_CAPITAL) & 1 != 0 do keymode |= {.CapsLock}
-	if cast(u16)windows.GetKeyState(windows.VK_NUMLOCK) & 1 != 0 do keymode |= {.NumLock}
+@(private = "file")
+_get_keymod :: proc() -> (mod: Key_Modifiers) {
+	if cast(u16)windows.GetKeyState(windows.VK_SHIFT) & 0x8000 != 0 do mod |= {.Shift}
+	if cast(u16)windows.GetKeyState(windows.VK_CONTROL) & 0x8000 != 0 do mod |= {.Ctrl}
+	if cast(u16)windows.GetKeyState(windows.VK_MENU) & 0x8000 != 0 do mod |= {.Alt}
+	if cast(u16)windows.GetKeyState(windows.VK_CAPITAL) & 1 != 0 do mod |= {.CapsLock}
+	if cast(u16)windows.GetKeyState(windows.VK_NUMLOCK) & 1 != 0 do mod |= {.NumLock}
 
-	// lwin := cast(u16)windows.GetKeyState(windows.VK_LWIN) & 0x8000 != 0
-	// rwin := cast(u16)windows.GetKeyState(windows.VK_RWIN) & 0x8000 != 0
-	// if lwin || rwin do keymode |= {.Super}
+	lwin := cast(u16)windows.GetKeyState(windows.VK_LWIN) & 0x8000 != 0
+	rwin := cast(u16)windows.GetKeyState(windows.VK_RWIN) & 0x8000 != 0
+	if lwin || rwin do mod |= {.Super}
 
-	return keymode
+	return mod
 }
 
 @(private = "file")
-_keycode_from_vkey :: proc(vkey: u32) -> platform.Key_Code {
+_keycode_from_vkey :: proc(vkey: u32) -> Key_Code {
 	switch vkey {
 	case 'A':
 		return .A
@@ -339,11 +325,11 @@ _keycode_from_vkey :: proc(vkey: u32) -> platform.Key_Code {
 	case 'Z':
 		return .Z
 	case '0' ..= '9':
-		return ._0 + cast(platform.Key_Code)(vkey - '0')
+		return ._0 + cast(Key_Code)(vkey - '0')
 	case windows.VK_NUMPAD0 ..= windows.VK_NUMPAD9:
-		return .Num0 + cast(platform.Key_Code)(vkey - windows.VK_NUMPAD0)
+		return .Num0 + cast(Key_Code)(vkey - windows.VK_NUMPAD0)
 	case windows.VK_F1 ..= windows.VK_F24:
-		return .F1 + cast(platform.Key_Code)(vkey - windows.VK_F1)
+		return .F1 + cast(Key_Code)(vkey - windows.VK_F1)
 	case windows.VK_SPACE:
 		return .Space
 	case windows.VK_OEM_3:
@@ -402,27 +388,17 @@ _keycode_from_vkey :: proc(vkey: u32) -> platform.Key_Code {
 		return .CapsLock
 	case windows.VK_NUMLOCK:
 		return .NumLock
+	case windows.VK_LWIN, windows.VK_RWIN:
+		return .Super
 	// case windows.VK_SCROLL:
 	// 	return .ScrollLock
 	case windows.VK_APPS:
 		return .Menu
-	case windows.VK_CONTROL:
+	case windows.VK_CONTROL, windows.VK_LCONTROL, windows.VK_RCONTROL:
 		return .Ctrl
-	case windows.VK_LCONTROL:
-		return .Ctrl
-	case windows.VK_RCONTROL:
-		return .Ctrl
-	case windows.VK_SHIFT:
+	case windows.VK_SHIFT, windows.VK_LSHIFT, windows.VK_RSHIFT:
 		return .Shift
-	case windows.VK_LSHIFT:
-		return .Shift
-	case windows.VK_RSHIFT:
-		return .Shift
-	case windows.VK_MENU:
-		return .Alt
-	case windows.VK_LMENU:
-		return .Alt
-	case windows.VK_RMENU:
+	case windows.VK_MENU, windows.VK_LMENU, windows.VK_RMENU:
 		return .Alt
 	case windows.VK_DIVIDE:
 		return .NumSlash
@@ -434,16 +410,15 @@ _keycode_from_vkey :: proc(vkey: u32) -> platform.Key_Code {
 		return .NumPlus
 	case windows.VK_DECIMAL:
 		return .NumPeriod
-	// case 0xDF ..< 0xFF:
-	case 0xDF ..= 0xFC:
-		// TODO: check
-		return .Ex0 + cast(platform.Key_Code)(vkey - 0xDF)
-	}
+	// case 0xDF ..= 0xFC:
+	// 	// TODO: check
+	// 	return .Ex0 + cast(Key_Code)(vkey - 0xDF)
+	// }
 	return .Null
 }
 
 @(private = "file")
-_vkey_from_keycode :: proc(keycode: platform.Key_Code) -> u32 {
+_vkey_from_keycode :: proc(keycode: Key_Code) -> u32 {
 	switch keycode {
 	case .Null:
 		return 0
@@ -491,6 +466,8 @@ _vkey_from_keycode :: proc(keycode: platform.Key_Code) -> u32 {
 		return windows.VK_OEM_5
 	case .CapsLock:
 		return windows.VK_CAPITAL
+	case .Super:
+		return windows.VK_LWIN
 	case .A:
 		return 'A'
 	case .S:
@@ -569,8 +546,8 @@ _vkey_from_keycode :: proc(keycode: platform.Key_Code) -> u32 {
 		return windows.VK_DOWN
 	case .Right:
 		return windows.VK_RIGHT
-	case .Ex0 ..= .Ex29:
-		return cast(u32)0xDF + cast(u32)(keycode - .Ex0)
+		// case .Ex0 ..= .Ex29:
+	// 	return cast(u32)0xDF + cast(u32)(keycode - .Ex0)
 	case .NumLock:
 		return windows.VK_NUMLOCK
 	case .NumSlash:

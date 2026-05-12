@@ -1,12 +1,19 @@
-package render
+package platform
 
 import "base:runtime"
 import "core:fmt"
-import "core:sys/windows"
 import "vendor:OpenGL"
 
-gl_load_up_to :: proc(major, minor: int) {
-	OpenGL.load_up_to(major, minor, windows.gl_set_proc_address)
+gl_swap_interval :: #force_inline proc(interval: i32) -> bool {
+	return _gl_swap_interval(interval)
+}
+
+gl_swap_buffers :: #force_inline proc() {
+	_gl_swap_buffers()
+}
+
+gl_load :: proc() -> bool {
+	_gl_load() or_return
 
 	when ODIN_DEBUG {
 		OpenGL.Enable(OpenGL.DEBUG_OUTPUT)
@@ -26,7 +33,7 @@ gl_load_up_to :: proc(major, minor: int) {
 			OpenGL.DEBUG_SEVERITY_MEDIUM,
 			0,
 			nil,
-			false,
+			true,
 		)
 		OpenGL.DebugMessageControl(
 			OpenGL.DONT_CARE,
@@ -47,12 +54,16 @@ gl_load_up_to :: proc(major, minor: int) {
 
 		OpenGL.DebugMessageCallback(_gl_debug_callback, nil)
 	}
+
+	return true
 }
 
-/*
-*
-*/
+GL_VERSION_MAJOR :: 4
+GL_VERSION_MINOR :: 3
 
+//
+// Private
+//
 @(private = "file")
 _gl_debug_callback :: proc "c" (
 	source: u32,
@@ -65,23 +76,23 @@ _gl_debug_callback :: proc "c" (
 ) {
 	context = runtime.default_context()
 
-	source_str: string
+	src_str: string
 	switch source {
 	case OpenGL.DEBUG_SOURCE_API:
-		source_str = "API"
+		src_str = "API"
 	case OpenGL.DEBUG_SOURCE_WINDOW_SYSTEM:
-		source_str = "WINDOW_SYSTEM"
+		src_str = "WINDOW_SYSTEM"
 	case OpenGL.DEBUG_SOURCE_SHADER_COMPILER:
 		return // vendor:OpenGL will handle
-	// source_str = "SHADER_COMPILER"
+	// src_str = "SHADER_COMPILER"
 	case OpenGL.DEBUG_SOURCE_THIRD_PARTY:
-		source_str = "THIRD_PARTY"
+		src_str = "THIRD_PARTY"
 	case OpenGL.DEBUG_SOURCE_APPLICATION:
-		source_str = "APPLICATION"
+		src_str = "APPLICATION"
 	case OpenGL.DEBUG_SOURCE_OTHER:
-		source_str = "OTHER"
+		src_str = "OTHER"
 	case:
-		source_str = "UNKNOWN"
+		src_str = "UNKNOWN"
 	}
 
 	type_str: string
@@ -122,5 +133,5 @@ _gl_debug_callback :: proc "c" (
 		severity_str = "UNKNOWN"
 	}
 
-	fmt.eprintfln("[GL %s] [%s] [%s] (%d): %s", severity_str, source_str, type_str, id, message)
+	fmt.eprintfln("[GL %s] [%s] [%s] (%d): %s", severity_str, src_str, type_str, id, message)
 }

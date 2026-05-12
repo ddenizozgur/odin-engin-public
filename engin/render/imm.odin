@@ -5,10 +5,9 @@ import "core:fmt"
 import "core:math/linalg"
 import "core:mem"
 import "core:mem/virtual"
-import "core:sys/windows"
 import "vendor:OpenGL"
 
-import "../platform/win32"
+import "../platform"
 
 // TODO: flush when exceed 1MiB
 Imm_Per_Data :: struct {
@@ -41,7 +40,7 @@ imm_begin_frame :: proc() -> bool {
 imm_end_frame :: proc() {
 	_flush()
 
-	windows.SwapBuffers(win32._hdc)
+	platform.gl_swap_buffers()
 	// windows.ValidateRect(win32._hwnd, nil) // TODO: check
 }
 
@@ -358,7 +357,7 @@ _flush :: proc() -> bool {
 	OpenGL.BindVertexArray(_vao)
 	OpenGL.BindBuffer(OpenGL.ARRAY_BUFFER, _vbo)
 
-	client_size := win32.get_client_size()
+	client_size := platform.get_client_size()
 	proj_ortho := linalg.matrix_ortho3d(
 		0,
 		cast(f32)client_size.x,

@@ -1,7 +1,6 @@
 package render
 
 import "../platform"
-import "../platform/win32"
 import "base:runtime"
 import "core:fmt"
 import "core:math/linalg"

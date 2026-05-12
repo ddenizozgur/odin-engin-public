@@ -4,16 +4,10 @@ import "base:runtime"
 import "core:fmt"
 import "core:math"
 import "core:math/linalg"
-import "core:sys/windows"
 import "core:time"
 
 import "engin/platform"
-import "engin/platform/win32"
 import "engin/render"
-
-/*
-*
-*/
 
 font: render.Font
 
@@ -35,8 +29,8 @@ to_update :: proc(dt: f32) -> bool {
 	@(static) et: f32
 	defer et += dt
 
-	client_size := cast([2]f32)win32.get_client_size()
-	mouse_pos := cast([2]f32)win32.get_mouse_pos()
+	client_size := cast([2]f32)platform.get_client_size()
+	mouse_pos := cast([2]f32)platform.get_mouse_pos()
 
 	{
 		render.IMM_FRAME_SCOPED()
@@ -57,15 +51,11 @@ to_update :: proc(dt: f32) -> bool {
 }
 
 main :: proc() {
-	win32.set_console_utf8()
+	platform.win32_set_console_utf8()
 
-	win32.window_init("Kralsın", {1280, 800}, .Windowed)
-	defer win32.window_free()
-
-	win32.wgl_init()
-	windows.wglSwapIntervalEXT(0)
-
-	render.gl_load_up_to(4, 3)
+	platform.window_init("Kralsın", {1280, 800}, .Windowed)
+	defer platform.window_free()
+	platform.gl_load()
 
 	prev_time := time.now()
 
@@ -75,17 +65,25 @@ main :: proc() {
 		dt := cast(f32)time.duration_seconds(duration)
 		prev_time = curr_time
 
-		win32.poll_events_this_frame()
-		for event in platform.events_this_frame {
-			#partial switch data in event {
+		platform.poll_events_this_frame()
+		for evnt in platform.events_this_frame {
+			#partial switch data in evnt {
 			case platform.Event_Window_Close:
 				break frame_loop
+			case platform.Event_Mouse_Button:
+				switch data.state {
+				case .Pressed:
+					fmt.println("valla bastı")
+				case .Released:
+					fmt.println("valla çekti")
+				}
 			}
-		}
 
-		to_update(dt)
+			to_update(dt)
+		}
 	}
 }
+
 
 @(export) //link_name="NvOptimusEnablement"
 NvOptimusEnablement: u32 = 1
@@ -151,7 +149,7 @@ draw_some_text :: proc(font: render.Font, pos: [2]f32, scale: f32, color: render
 }
 
 aurora_bg :: proc(et: f32) {
-	client := cast([2]f32)win32.get_client_size()
+	client := cast([2]f32)platform.get_client_size()
 
 	s1 := math.sin_f32(et * 0.15)
 	s2 := math.cos_f32(et * 0.22)
@@ -174,7 +172,7 @@ aurora_bg :: proc(et: f32) {
 }
 
 torture_test_liquid_neon :: proc(font: render.Font, et: f32) {
-	client_size := cast([2]f32)win32.get_client_size()
+	client_size := cast([2]f32)platform.get_client_size()
 
 	cols := 40
 	rows := 25
