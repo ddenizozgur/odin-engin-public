@@ -22,7 +22,7 @@ Event_Mouse_Button :: struct {
 	button: Mouse_Button,
 	state:  Key_State,
 }
-Event_Mouse_Move :: distinct [2]int
+Event_Mouse_Move :: distinct [2]i32
 Event_Mouse_Scroll :: distinct [2]f32
 
 Event_Window_Resize :: distinct [2]int

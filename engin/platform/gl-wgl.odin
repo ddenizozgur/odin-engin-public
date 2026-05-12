@@ -1,11 +1,13 @@
 #+build windows
 package platform
 
+import "core:fmt"
 import "core:sys/windows"
+import "vendor:OpenGL"
 
 @(private) // TODO
 _gl_swap_interval :: #force_inline proc(interval: i32) -> bool {
-	return cast(bool)windows.SwapInterval(_hwnd, interval)
+	return cast(bool)windows.wglSwapIntervalEXT(interval)
 }
 
 @(private)

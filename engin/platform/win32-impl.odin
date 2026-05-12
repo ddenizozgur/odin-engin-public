@@ -235,7 +235,7 @@ _hdc: windows.HDC
 _display_settings: windows.DEVMODEW
 @(private = "file", init)
 _display_settings_init :: proc "contextless" () {
-	windows.EnumDisplaySettingsW(nil, windows.ENUM_CURRENT_SETTINGS, &display_settings)
+	windows.EnumDisplaySettingsW(nil, windows.ENUM_CURRENT_SETTINGS, &_display_settings)
 }
 
 /*

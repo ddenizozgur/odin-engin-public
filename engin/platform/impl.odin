@@ -52,6 +52,7 @@ poll_events_this_frame :: proc() {
 		_mouse_btns_prev_frame[it] = state
 	}
 	clear(&events_this_frame)
+
 	_poll_events_this_frame()
 }
 

@@ -1,9 +1,10 @@
 #+build windows
 package platform
 
-import "core:unicode/utf16"
 import "base:runtime"
 import "core:sys/windows"
+import "core:unicode"
+import "core:unicode/utf16"
 
 // TODO: blocking version
 @(private)
@@ -64,60 +65,42 @@ _window_proc :: proc "system" (
 		btn := Mouse_Button.Left
 		_mouse_btns_this_frame[btn] = false
 
-		append(
-			&events_this_frame,
-			Event_Mouse_Button{state = .Released, button = btn},
-		)
+		append(&events_this_frame, Event_Mouse_Button{state = .Released, button = btn})
 	case windows.WM_LBUTTONDOWN:
 		windows.SetCapture(hwnd)
 
 		btn := Mouse_Button.Left
 		_mouse_btns_this_frame[btn] = true
 
-		append(
-			&events_this_frame,
-			Event_Mouse_Button{state = .Pressed, button = btn},
-		)
+		append(&events_this_frame, Event_Mouse_Button{state = .Pressed, button = btn})
 	case windows.WM_MBUTTONUP:
 		windows.ReleaseCapture()
 
 		btn := Mouse_Button.Middle
 		_mouse_btns_this_frame[btn] = false
 
-		append(
-			&events_this_frame,
-			Event_Mouse_Button{state = .Released, button = btn},
-		)
+		append(&events_this_frame, Event_Mouse_Button{state = .Released, button = btn})
 	case windows.WM_MBUTTONDOWN:
 		windows.SetCapture(hwnd)
 
 		btn := Mouse_Button.Middle
 		_mouse_btns_this_frame[btn] = true
 
-		append(
-			&events_this_frame,
-			Event_Mouse_Button{state = .Pressed, button = btn},
-		)
+		append(&events_this_frame, Event_Mouse_Button{state = .Pressed, button = btn})
 	case windows.WM_RBUTTONUP:
 		windows.ReleaseCapture()
 
 		btn := Mouse_Button.Right
 		_mouse_btns_this_frame[btn] = false
 
-		append(
-			&events_this_frame,
-			Event_Mouse_Button{state = .Released, button = btn},
-		)
+		append(&events_this_frame, Event_Mouse_Button{state = .Released, button = btn})
 	case windows.WM_RBUTTONDOWN:
 		windows.SetCapture(hwnd)
 
 		btn := Mouse_Button.Right
 		_mouse_btns_this_frame[btn] = true
 
-		append(
-			&events_this_frame,
-			Event_Mouse_Button{state = .Pressed, button = btn},
-		)
+		append(&events_this_frame, Event_Mouse_Button{state = .Pressed, button = btn})
 	case windows.WM_XBUTTONUP:
 		windows.ReleaseCapture()
 		// https://learn.microsoft.com/en-us/windows/win32/inputdev/wm-xbuttondown
@@ -127,10 +110,7 @@ _window_proc :: proc "system" (
 		btn: Mouse_Button = windows.HIWORD(wparam) == 1 ? .XButton1 : .XButton2
 		_mouse_btns_this_frame[btn] = false
 
-		append(
-			&events_this_frame,
-			Event_Mouse_Button{state = .Released, button = btn},
-		)
+		append(&events_this_frame, Event_Mouse_Button{state = .Released, button = btn})
 	case windows.WM_XBUTTONDOWN:
 		windows.SetCapture(hwnd)
 
@@ -138,10 +118,7 @@ _window_proc :: proc "system" (
 		btn: Mouse_Button = windows.HIWORD(wparam) == 1 ? .XButton1 : .XButton2
 		_mouse_btns_this_frame[btn] = true
 
-		append(
-			&events_this_frame,
-			Event_Mouse_Button{state = .Pressed, button = btn},
-		)
+		append(&events_this_frame, Event_Mouse_Button{state = .Pressed, button = btn})
 
 	case windows.WM_MOUSEMOVE:
 		x := windows.GET_X_LPARAM(lparam)
@@ -191,8 +168,8 @@ _window_proc :: proc "system" (
 		append(
 			&events_this_frame,
 			Event_Key {
-				code = keycode,
-				mod = keymod,
+				code  = keycode,
+				mod   = keymod,
 				state = is_down ? .Pressed : .Released,
 				// is_repeat = is_down && was_down,
 				// repeat_count = is_down ? lparam & 0xffff : 0,
@@ -204,31 +181,31 @@ _window_proc :: proc "system" (
 	case windows.WM_CHAR:
 		// TODO: check
 		@(static) high_surrogate: rune
-    w := cast(rune)wparam
+		w := cast(rune)wparam
 
-    codepoint: rune
-    if utf16.is_surrogate(w) {
-        if high_surrogate == 0 {
-            high_surrogate = w
-            break
-        } else {
-            codepoint = utf16.decode_surrogate_pair(high_surrogate, w)
-            high_surrogate = 0
+		codepoint: rune
+		if utf16.is_surrogate(w) {
+			if high_surrogate == 0 {
+				high_surrogate = w
+				break
+			} else {
+				codepoint = utf16.decode_surrogate_pair(high_surrogate, w)
+				high_surrogate = 0
 
-            // broken/invalid
-            if codepoint == unicode.REPLACEMENT_CHAR {
-                break
-            }
-        }
-    } else {
-        codepoint = w
-        high_surrogate = 0
-    }
+				// broken/invalid
+				if codepoint == unicode.REPLACEMENT_CHAR {
+					break
+				}
+			}
+		} else {
+			codepoint = w
+			high_surrogate = 0
+		}
 
-    // Filter out ctrl chars
-    if unicode.is_print(codepoint) {
-        append(&events_this_frame, cast(Event_Text)codepoint)
-    }
+		// Filter out ctrl chars
+		if unicode.is_print(codepoint) {
+			append(&events_this_frame, cast(Event_Text)codepoint)
+		}
 
 	case windows.WM_ERASEBKGND:
 		result = 1 // we fill out the client area so no need to erase the background
@@ -413,7 +390,7 @@ _keycode_from_vkey :: proc(vkey: u32) -> Key_Code {
 	// case 0xDF ..= 0xFC:
 	// 	// TODO: check
 	// 	return .Ex0 + cast(Key_Code)(vkey - 0xDF)
-	// }
+	}
 	return .Null
 }
 
@@ -546,7 +523,7 @@ _vkey_from_keycode :: proc(keycode: Key_Code) -> u32 {
 		return windows.VK_DOWN
 	case .Right:
 		return windows.VK_RIGHT
-		// case .Ex0 ..= .Ex29:
+	// case .Ex0 ..= .Ex29:
 	// 	return cast(u32)0xDF + cast(u32)(keycode - .Ex0)
 	case .NumLock:
 		return windows.VK_NUMLOCK
