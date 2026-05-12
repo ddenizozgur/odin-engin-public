@@ -21,6 +21,17 @@ _gl_load :: proc() -> bool {
 	OpenGL.load_up_to(GL_VERSION_MAJOR, GL_VERSION_MINOR, egl.gl_set_proc_address)
 	return true
 }
+@(private)
+_gl_cleanup :: proc() {
+	if _egl_display != nil {
+		egl.MakeCurrent(_egl_display, egl.NO_SURFACE, egl.NO_SURFACE, egl.NO_CONTEXT)
+
+		if _egl_surface != nil {egl.DestroySurface(_egl_display, _egl_surface)}
+		if _egl_context != nil {egl.DestroyContext(_egl_display, _egl_context)}
+
+		egl.Terminate(_egl_display)
+	}
+}
 
 //
 // Private

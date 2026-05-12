@@ -12,6 +12,11 @@ gl_swap_buffers :: #force_inline proc() {
 	_gl_swap_buffers()
 }
 
+// gl_cleanup :: #force_inline proc() {
+// 	when ODIN_OS == .Linux {
+// 		_gl_cleanup()
+// 	}
+// }
 gl_load :: proc() -> bool {
 	_gl_load() or_return
 

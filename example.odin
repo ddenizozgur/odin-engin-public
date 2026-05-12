@@ -38,7 +38,7 @@ to_update :: proc(dt: f32) -> bool {
 		// render.clear_target(render.NAYSAYER_BG)
 		aurora_bg(et)
 
-		torture_test_liquid_neon(font, et)
+		// torture_test_liquid_neon(font, et)
 
 		// render.ui_to_test(font)
 

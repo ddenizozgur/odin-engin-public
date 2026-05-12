@@ -115,8 +115,8 @@ _poll_events_this_frame :: proc() {
 			}
 
 		case .MotionNotify:
-			mouse_x := cast(int)xevent.xmotion.x
-			mouse_y := cast(int)xevent.xmotion.y
+			mouse_x := xevent.xmotion.x
+			mouse_y := xevent.xmotion.y
 			append(&events_this_frame, Event_Mouse_Move{mouse_x, mouse_y})
 
 		// case .EnterNotify:

@@ -149,6 +149,7 @@ _get_client_size :: proc() -> [2]i32 {
 
 @(private)
 _get_mouse_pos :: proc() -> [2]i32 {
+	child: xlib.Window
 	root_rel_x, root_rel_y: i32
 	child_rel_x, child_rel_y: i32
 	keymask: xlib.KeyMask
@@ -157,11 +158,11 @@ _get_mouse_pos :: proc() -> [2]i32 {
 		_display,
 		_window,
 		&_root_window,
-		nil, // child???
+		&child, // child???
 		&root_rel_x,
 		&root_rel_y,
 		&child_rel_x,
-		&child_rel_x,
+		&child_rel_y,
 		&keymask,
 	)
 
@@ -199,6 +200,7 @@ _Atom_Names :: enum {
 
 @(private = "file")
 _init_state :: proc() -> bool {
+	// xlib.InitThreads()
 	_display = xlib.OpenDisplay(nil)
 	if _display == nil {
 		assert(false, "xlib.OpenDisplay(): failed")
