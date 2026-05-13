@@ -149,7 +149,7 @@ _window_proc :: proc "system" (
 		keycode := _keycode_from_vkey(cast(u32)wparam)
 		keymod := _get_keymod()
 
-		// TODO: do we want this???
+		// do we want this???
 		#partial switch keycode {
 		case .Ctrl:
 			keymod -= {.Ctrl}
@@ -179,7 +179,6 @@ _window_proc :: proc "system" (
 	case windows.WM_SYSCHAR:
 		result = windows.DefWindowProcW(hwnd, msg, wparam, lparam)
 	case windows.WM_CHAR:
-		// TODO: check
 		@(static) high_surrogate: rune
 		w := cast(rune)wparam
 
@@ -225,8 +224,7 @@ _window_proc :: proc "system" (
 // }
 
 // const bool swapped = (TRUE == GetSystemMetrics(SM_SWAPBUTTON));
-// TODO: check for swapped mouse buttons???
-
+// check for swapped mouse buttons???
 
 @(private = "file")
 _MOUSE_SCROLL_NORMVAL :: f32(120)

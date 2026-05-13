@@ -6,7 +6,6 @@ import "core:fmt"
 import "core:unicode"
 import "vendor:x11/xlib"
 
-// TODO: blocking version
 @(private)
 _poll_events_this_frame :: proc() {
 	for xlib.Pending(_display) > 0 {
@@ -36,7 +35,7 @@ _poll_events_this_frame :: proc() {
 					&status,
 				)
 
-				if is_down && written > 0 {
+				if written > 0 {
 					text_str := string(text_buf[:written])
 					for codepoint in text_str {
 						if unicode.is_graphic(codepoint) {
@@ -45,7 +44,7 @@ _poll_events_this_frame :: proc() {
 					}
 				}
 			} else {
-				// XLookupKeysym() cant handle the modifiers
+				// XLookupKeysym() cant handle modifiers
 				status: xlib.XComposeStatus
 				xlib.LookupString(&xevent.xkey, &text_buf[0], len(text_buf), &keysym, &status)
 			}
@@ -141,11 +140,16 @@ _poll_events_this_frame :: proc() {
 		case .FocusOut:
 			append(&events_this_frame, Event_Window_UnFocus{})
 
+		/*
 		case .UnmapNotify:
 			// dont work ???
 			append(&events_this_frame, Event_Window_Minimize{})
+			fmt.println("minimize")
 		case .MapNotify:
 			append(&events_this_frame, Event_Window_Restore{})
+			fmt.println("restore")
+		*/
+
 
 		// case .PropertyNotify:
 		// 	atom := xevent.xproperty.atom

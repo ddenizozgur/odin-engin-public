@@ -21,7 +21,7 @@ _window_init :: proc(title: string, size: [2]int, style := Window_Style.Windowed
 		detectable: b32
 		xlib.XkbSetDetectableAutoRepeat(_display, true, &detectable)
 		if !detectable {
-			fmt.eprintfln("[ERROR] Input system might receive rapid press/release for held keys.")
+			fmt.eprintfln("[ERROR] Input system might receive key-release while key-down.")
 		}
 
 		_root_window = xlib.DefaultRootWindow(_display) // desktop as root
@@ -101,7 +101,7 @@ _window_init :: proc(title: string, size: [2]int, style := Window_Style.Windowed
 		)
 	}
 
-	// change the title
+	// change title
 	xlib.ChangeProperty(
 		_display,
 		_window,
