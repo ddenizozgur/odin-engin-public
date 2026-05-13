@@ -2,6 +2,7 @@
 //#+build linux, freebsd, openbsd, netbsd ????
 package platform
 
+import "core:fmt"
 import "core:unicode"
 import "vendor:x11/xlib"
 
@@ -12,22 +13,43 @@ _poll_events_this_frame :: proc() {
 		xevent: xlib.XEvent
 		xlib.NextEvent(_display, &xevent)
 
+		if xlib.FilterEvent(&xevent, xlib.None) {
+			continue
+		}
+
 		#partial switch xevent.type {
 		case .KeyPress, .KeyRelease:
-			status: xlib.LookupStringStatus
-			text_buf: [256]byte
-			keysym: xlib.KeySym
-
-			written := xlib.Xutf8LookupString(
-				_xic,
-				&xevent.xkey,
-				cast(cstring)&text_buf[0],
-				len(text_buf),
-				&keysym,
-				&status,
-			)
-
 			is_down := xevent.type == .KeyPress
+			keysym: xlib.KeySym
+			text_buf: [256]byte
+
+			if is_down {
+				status: xlib.LookupStringStatus
+
+				// This only checks keydown events
+				written := xlib.Xutf8LookupString(
+					_xic,
+					&xevent.xkey,
+					cast(cstring)&text_buf[0],
+					len(text_buf),
+					&keysym,
+					&status,
+				)
+
+				if is_down && written > 0 {
+					text_str := string(text_buf[:written])
+					for codepoint in text_str {
+						if unicode.is_graphic(codepoint) {
+							append(&events_this_frame, cast(Event_Text)codepoint)
+						}
+					}
+				}
+			} else {
+				// XLookupKeysym() cant handle the modifiers
+				status: xlib.XComposeStatus
+				xlib.LookupString(&xevent.xkey, &text_buf[0], len(text_buf), &keysym, &status)
+			}
+
 			keycode := _keycode_from_keysym(keysym)
 			keymod := _get_keymod(xevent.xkey.state)
 
@@ -50,15 +72,6 @@ _poll_events_this_frame :: proc() {
 				&events_this_frame,
 				Event_Key{code = keycode, mod = keymod, state = is_down ? .Pressed : .Released},
 			)
-
-			if is_down && written > 0 {
-				text_str := string(text_buf[:written])
-				for codepoint in text_str {
-					if unicode.is_graphic(codepoint) {
-						append(&events_this_frame, cast(Event_Text)codepoint)
-					}
-				}
-			}
 
 		case .ButtonPress, .ButtonRelease:
 			xbtn := cast(u32)xevent.xbutton.button
@@ -129,21 +142,28 @@ _poll_events_this_frame :: proc() {
 			append(&events_this_frame, Event_Window_UnFocus{})
 
 		case .UnmapNotify:
+			// dont work ???
 			append(&events_this_frame, Event_Window_Minimize{})
 		case .MapNotify:
 			append(&events_this_frame, Event_Window_Restore{})
 
-		case .ConfigureNotify:
-			// TODO: check
-			@(static) client_w, client_h: int
+		// case .PropertyNotify:
+		// 	atom := xevent.xproperty.atom
+		// 	if atom == _atoms[._NET_WM_STATE] {
+		// 		fmt.println("cowabunga!")
+		// 	} else if atom == _atoms[.WM_STATE] {
+		// 		fmt.println("minim inş")
+		// 	}
 
-			new_w := cast(int)xevent.xconfigure.width
-			new_h := cast(int)xevent.xconfigure.height
+		case .ConfigureNotify:
+			@(static) client_w, client_h: i32
+
+			new_w := xevent.xconfigure.width
+			new_h := xevent.xconfigure.height
 
 			if new_w != client_w || new_h != client_h {
-				client_w = new_w
-				client_h = new_h
-
+				// not so spammy btw but just in case
+				client_w, client_h = new_w, new_h
 				append(&events_this_frame, Event_Window_Resize{new_w, new_h})
 			}
 
@@ -167,7 +187,7 @@ _get_keymod :: proc(mask: xlib.InputMask) -> (mod: Key_Modifiers) {
 	if .ControlMask in mask do mod += {.Ctrl}
 	if .Mod1Mask in mask do mod += {.Alt}
 	if .Mod4Mask in mask do mod += {.Super}
-	if .LockMask in mask do mod += {.CapsLock} //????
+	if .LockMask in mask do mod += {.CapsLock}
 	if .Mod2Mask in mask do mod += {.NumLock}
 
 	return mod
@@ -266,29 +286,29 @@ _keycode_from_keysym :: proc(keysym: xlib.KeySym) -> Key_Code {
 		return .Pause
 	case .XK_Escape:
 		return .Esc
-	case .XK_Up:
+	case .XK_Up, .XK_KP_Up:
 		return .Up
-	case .XK_Left:
+	case .XK_Left, .XK_KP_Left:
 		return .Left
-	case .XK_Down:
+	case .XK_Down, .XK_KP_Down:
 		return .Down
-	case .XK_Right:
+	case .XK_Right, .XK_KP_Right:
 		return .Right
 	case .XK_BackSpace:
 		return .Backspace
 	case .XK_Return, .XK_KP_Enter:
 		return .Return
-	case .XK_Delete:
+	case .XK_Delete, .XK_KP_Delete:
 		return .Delete
-	case .XK_Insert:
+	case .XK_Insert, .XK_KP_Insert:
 		return .Insert
-	case .XK_Page_Up:
+	case .XK_Page_Up, .XK_KP_Page_Up:
 		return .PageUp
-	case .XK_Page_Down:
+	case .XK_Page_Down, .XK_KP_Page_Down:
 		return .PageDown
-	case .XK_Home:
+	case .XK_Home, .XK_KP_Home:
 		return .Home
-	case .XK_End:
+	case .XK_End, .XK_KP_End:
 		return .End
 	case .XK_Caps_Lock:
 		return .CapsLock

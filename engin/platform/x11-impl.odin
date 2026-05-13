@@ -9,12 +9,39 @@ import "vendor:x11/xlib"
 
 @(private)
 _window_init :: proc(title: string, size: [2]int, style := Window_Style.Windowed) -> bool {
-	if _display == nil {
-		if good := _init_state(); !good {
+	{
+		// xlib.InitThreads()
+		// xlib.SetErrorHandler(_err_handler)
+		_display = xlib.OpenDisplay(nil)
+		if _display == nil {
+			fmt.eprintfln("[ERROR] xlib.OpenDisplay(): failed")
 			return false
 		}
-	} else {
-		assert(false, "x11.window_init() alredy initted")
+
+		detectable: b32
+		xlib.XkbSetDetectableAutoRepeat(_display, true, &detectable)
+		if !detectable {
+			fmt.eprintfln("[ERROR] Input system might receive rapid press/release for held keys.")
+		}
+
+		_root_window = xlib.DefaultRootWindow(_display) // desktop as root
+
+		{
+			atom_strs := reflect.enum_field_names(_Atom_Names)
+			for it, i in _Atom_Names {
+				runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
+				atom_cstr := strings.clone_to_cstring(
+					atom_strs[i],
+					allocator = context.temp_allocator,
+				)
+				_atoms[it] = xlib.InternAtom(_display, atom_cstr, false)
+			}
+		}
+
+		_xim = xlib.OpenIM(_display, nil, nil, nil)
+		if _xim == nil {
+			fmt.eprintfln("[ERROR] UTF8 text input")
+		}
 	}
 
 	_window = xlib.CreateWindow(
@@ -43,6 +70,7 @@ _window_init :: proc(title: string, size: [2]int, style := Window_Style.Windowed
 			.PointerMotion,
 			.FocusChange,
 			.StructureNotify,
+			.PropertyChange,
 			// TODO: .Exposure, maybe dont need???
 			// .VisibilityChange,
 			// .KeymapState,
@@ -98,6 +126,7 @@ _window_init :: proc(title: string, size: [2]int, style := Window_Style.Windowed
 			1, // We are only sending 1 atom
 		)
 	}
+
 	xlib.MapWindow(_display, _window)
 	xlib.Flush(_display)
 
@@ -158,7 +187,7 @@ _get_mouse_pos :: proc() -> [2]i32 {
 		_display,
 		_window,
 		&_root_window,
-		&child, // child???
+		&child,
 		&root_rel_x,
 		&root_rel_y,
 		&child_rel_x,
@@ -196,58 +225,8 @@ _Atom_Names :: enum {
 	UTF8_STRING,
 	_NET_WM_STATE,
 	_NET_WM_STATE_FULLSCREEN,
-}
-
-@(private = "file")
-_init_state :: proc() -> bool {
-	// xlib.InitThreads()
-	// xlib.SetErrorHandler(_err_handler)
-
-	_display = xlib.OpenDisplay(nil)
-	if _display == nil {
-		assert(false, "xlib.OpenDisplay(): failed")
-		return false
-	}
-	_root_window = xlib.DefaultRootWindow(_display) // desktop as root
-
-	/*
-	{
-		atom_strs := reflect.enum_field_names(_Atom_Names)
-		atom_cstrs: [len(_Atom_Names)]cstring
-
-		runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
-
-		for name, i in atom_strs {
-			atom_cstrs[i] = strings.clone_to_cstring(name, allocator = context.temp_allocator)
-		}
-
-		XInternAtoms(
-			_display,
-			raw_data(atom_cstrs[:]),
-			len(atom_cstrs),
-			false,
-			&_atoms[_Atom_Names(0)],
-		)
-	}
-	*/
-
-	{
-		atom_strs := reflect.enum_field_names(_Atom_Names)
-
-		for it, i in _Atom_Names {
-			runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
-			atom_cstr := strings.clone_to_cstring(atom_strs[i], allocator = context.temp_allocator)
-			_atoms[it] = xlib.InternAtom(_display, atom_cstr, false)
-		}
-	}
-
-	_xim = xlib.OpenIM(_display, nil, nil, nil)
-	if _xim == nil {
-		fmt.eprintfln("[ERROR] UTF8 text input")
-		return false
-	}
-
-	return true
+	// _NET_WM_STATE_HIDDEN,
+	// WM_STATE,
 }
 
 /*
@@ -255,10 +234,8 @@ foreign import xlib_ext "system:X11"
 @(default_calling_convention = "c")
 foreign xlib_ext {
 	XDestroyIC :: proc(ic: xlib.XIC) ---
-	// XInternAtoms :: proc(display: ^xlib.Display, names: [^]cstring, count: i32, only_if_exists: bool, atoms_return: [^]xlib.Atom) -> xlib.Status ---
 }
 */
-
 
 // _err_handler :: proc "c" (display: ^xlib.Display, event: ^xlib.XErrorEvent) -> i32 {
 // 	context = runtime.default_context()

@@ -68,16 +68,11 @@ main :: proc() {
 
 		platform.poll_events_this_frame()
 		for evnt in platform.events_this_frame {
+			// input_demo(evnt)
+
 			#partial switch data in evnt {
 			case platform.Event_Window_Close:
 				break frame_loop
-			case platform.Event_Mouse_Button:
-				switch data.state {
-				case .Pressed:
-					fmt.println("valla bastı")
-				case .Released:
-					fmt.println("valla çekti")
-				}
 			}
 		}
 
@@ -148,6 +143,36 @@ draw_some_text :: proc(font: render.Font, pos: [2]f32, scale: f32, color: render
 		}
 	}
 }
+
+input_demo :: proc(evnt: platform.Event) {
+	switch data in evnt {
+	case platform.Event_Key:
+		fmt.printfln("[Key] %v", data)
+	case platform.Event_Text:
+		fmt.printfln("[Text] %v", data)
+	case platform.Event_Mouse_Button:
+		fmt.printfln("[Button] %v", data)
+	case platform.Event_Mouse_Move:
+		fmt.printfln("[Move] %v", data)
+	case platform.Event_Mouse_Scroll:
+		fmt.printfln("[Scroll] %v", data)
+	case platform.Event_Window_Resize:
+		fmt.printfln("[Resize] %v", data)
+	case platform.Event_Window_Focus:
+		fmt.printfln("[Focus] %v", data)
+	case platform.Event_Window_UnFocus:
+		fmt.printfln("[UnFocus] %v", data)
+	case platform.Event_Window_Minimize:
+		fmt.printfln("[Minimize] %v", data)
+	case platform.Event_Window_Restore:
+		fmt.printfln("[Restore] %v", data)
+	case platform.Event_Window_Maximize:
+		fmt.printfln("[Maximize] %v", data)
+	case platform.Event_Window_Close:
+		fmt.printfln("[Close] %v", data)
+	}
+}
+
 
 aurora_bg :: proc(et: f32) {
 	client := cast([2]f32)platform.get_client_size()
