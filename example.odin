@@ -68,7 +68,7 @@ main :: proc() {
 
 		platform.poll_events_this_frame()
 		for evnt in platform.events_this_frame {
-			// input_demo(evnt)
+			input_demo(evnt)
 
 			#partial switch data in evnt {
 			case platform.Event_Window_Close:
@@ -149,15 +149,13 @@ input_demo :: proc(evnt: platform.Event) {
 	case platform.Event_Key:
 		fmt.printfln("[Key] %v", data)
 	case platform.Event_Text:
-		fmt.printfln("[Text] %v", data)
+	// fmt.printfln("[Text] %v", data)
 	case platform.Event_Mouse_Button:
-		fmt.printfln("[Button] %v", data)
+	// fmt.printfln("[Button] %v", data)
 	case platform.Event_Mouse_Move:
-		fmt.printfln("[Move] %v", data)
+	// fmt.printfln("[Move] %v", data)
 	case platform.Event_Mouse_Scroll:
-		fmt.printfln("[Scroll] %v", data)
-	case platform.Event_Window_Resize:
-		fmt.printfln("[Resize] %v", data)
+	// fmt.printfln("[Scroll] %v", data)
 	case platform.Event_Window_Focus:
 		fmt.printfln("[Focus] %v", data)
 	case platform.Event_Window_UnFocus:
@@ -169,7 +167,7 @@ input_demo :: proc(evnt: platform.Event) {
 	case platform.Event_Window_Maximize:
 		fmt.printfln("[Maximize] %v", data)
 	case platform.Event_Window_Close:
-		fmt.printfln("[Close] %v", data)
+	// fmt.printfln("[Close] %v", data)
 	}
 }
 

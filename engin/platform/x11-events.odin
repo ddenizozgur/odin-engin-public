@@ -168,7 +168,7 @@ _poll_events_this_frame :: proc() {
 			if new_w != client_w || new_h != client_h {
 				// not so spammy btw but just in case
 				client_w, client_h = new_w, new_h
-				append(&events_this_frame, Event_Window_Resize{new_w, new_h})
+				// append(&events_this_frame, Event_Window_Resize{new_w, new_h})
 			}
 
 		case .ClientMessage:
