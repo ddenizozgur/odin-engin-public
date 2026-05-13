@@ -25,7 +25,6 @@ Event_Mouse_Button :: struct {
 Event_Mouse_Move :: distinct [2]i32
 Event_Mouse_Scroll :: distinct [2]f32
 
-Event_Window_Resize :: distinct [2]i32
 Event_Window_Focus :: struct {}
 Event_Window_UnFocus :: struct {}
 Event_Window_Minimize :: struct {}
@@ -39,7 +38,6 @@ Event :: union {
 	Event_Mouse_Button,
 	Event_Mouse_Move,
 	Event_Mouse_Scroll,
-	Event_Window_Resize,
 	Event_Window_Focus,
 	Event_Window_UnFocus,
 	Event_Window_Minimize,

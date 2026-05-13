@@ -2,6 +2,7 @@
 package platform
 
 import "base:runtime"
+import "core:fmt"
 import "core:sys/windows"
 import "core:unicode"
 import "core:unicode/utf16"
@@ -35,14 +36,27 @@ _window_proc :: proc "system" (
 	case windows.WM_CLOSE:
 		append(&events_this_frame, Event_Window_Close{})
 
+	// case windows.WM_ENTERSIZEMOVE:
+	// 	_entersizemove = true
+	// case windows.WM_EXITSIZEMOVE:
+	// 	_entersizemove = false
+	// case windows.WM_SIZING:
+	// 	result = 1
+
 	case windows.WM_SIZE:
 		switch wparam {
 		case windows.SIZE_MINIMIZED:
+			_window_placement = .Minimize
 			append(&events_this_frame, Event_Window_Minimize{})
 		case windows.SIZE_MAXIMIZED:
+			_window_placement = .Maximize
 			append(&events_this_frame, Event_Window_Maximize{})
 		case windows.SIZE_RESTORED:
-			append(&events_this_frame, Event_Window_Restore{})
+			// append(&events_this_frame, Event_Window_Restore{})
+			if _window_placement != .Restore {
+				_window_placement = .Restore
+				append(&events_this_frame, Event_Window_Restore{})
+			}
 		}
 
 	case windows.WM_SETFOCUS:
@@ -226,7 +240,12 @@ _window_proc :: proc "system" (
 
 // const bool swapped = (TRUE == GetSystemMetrics(SM_SWAPBUTTON));
 // TODO: check for swapped mouse buttons???
-
+@(private = "file")
+_window_placement: enum {
+	Restore,
+	Minimize,
+	Maximize,
+}
 
 @(private = "file")
 _MOUSE_SCROLL_NORMVAL :: f32(120)
