@@ -4,6 +4,7 @@ import "base:runtime"
 import "core:fmt"
 import "core:math"
 import "core:math/linalg"
+import "core:strings"
 import "core:time"
 
 import "engin/platform"
@@ -53,7 +54,7 @@ to_update :: proc(dt: f32) -> bool {
 main :: proc() {
 	platform.win32_set_console_utf8()
 
-	platform.window_init("Kralsın", {1280, 800}, .Windowed)
+	platform.window_init("Kralsın", {1280, 800})
 	defer platform.window_free()
 	platform.gl_load()
 

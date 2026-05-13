@@ -201,20 +201,44 @@ _Atom_Names :: enum {
 @(private = "file")
 _init_state :: proc() -> bool {
 	// xlib.InitThreads()
+	// xlib.SetErrorHandler(_err_handler)
+
 	_display = xlib.OpenDisplay(nil)
 	if _display == nil {
 		assert(false, "xlib.OpenDisplay(): failed")
 		return false
 	}
-
-	// xlib.SetErrorHandler(_err_handler)
 	_root_window = xlib.DefaultRootWindow(_display) // desktop as root
 
-	atom_strs := reflect.enum_field_names(_Atom_Names)
-	for it, i in _Atom_Names {
+	/*
+	{
+		atom_strs := reflect.enum_field_names(_Atom_Names)
+		atom_cstrs: [len(_Atom_Names)]cstring
+
 		runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
-		atom_cstr := strings.clone_to_cstring(atom_strs[i], allocator = context.temp_allocator)
-		_atoms[it] = xlib.InternAtom(_display, atom_cstr, false)
+
+		for name, i in atom_strs {
+			atom_cstrs[i] = strings.clone_to_cstring(name, allocator = context.temp_allocator)
+		}
+
+		XInternAtoms(
+			_display,
+			raw_data(atom_cstrs[:]),
+			len(atom_cstrs),
+			false,
+			&_atoms[_Atom_Names(0)],
+		)
+	}
+	*/
+
+	{
+		atom_strs := reflect.enum_field_names(_Atom_Names)
+
+		for it, i in _Atom_Names {
+			runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
+			atom_cstr := strings.clone_to_cstring(atom_strs[i], allocator = context.temp_allocator)
+			_atoms[it] = xlib.InternAtom(_display, atom_cstr, false)
+		}
 	}
 
 	_xim = xlib.OpenIM(_display, nil, nil, nil)
@@ -226,9 +250,15 @@ _init_state :: proc() -> bool {
 	return true
 }
 
-// foreign import xlib_ext "system:X11"
-// @(default_calling_convention="c")
-// foreign xlib_ext { XDestroyIC :: proc(ic: xlib.XIC) --- }
+/*
+foreign import xlib_ext "system:X11"
+@(default_calling_convention = "c")
+foreign xlib_ext {
+	XDestroyIC :: proc(ic: xlib.XIC) ---
+	// XInternAtoms :: proc(display: ^xlib.Display, names: [^]cstring, count: i32, only_if_exists: bool, atoms_return: [^]xlib.Atom) -> xlib.Status ---
+}
+*/
+
 
 // _err_handler :: proc "c" (display: ^xlib.Display, event: ^xlib.XErrorEvent) -> i32 {
 // 	context = runtime.default_context()
