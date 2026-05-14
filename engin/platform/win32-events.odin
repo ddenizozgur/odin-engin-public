@@ -36,6 +36,7 @@ _window_proc :: proc "system" (
 	case windows.WM_CLOSE:
 		append(&events_this_frame, Event_Window_Close{})
 
+	// TODO: WM_INPUTLANGCHANGE ??
 	// case windows.WM_ENTERSIZEMOVE:
 	// 	_entersizemove = true
 	// case windows.WM_EXITSIZEMOVE:
@@ -52,7 +53,6 @@ _window_proc :: proc "system" (
 			_window_placement = .Maximize
 			append(&events_this_frame, Event_Window_Maximize{})
 		case windows.SIZE_RESTORED:
-			// append(&events_this_frame, Event_Window_Restore{})
 			if _window_placement != .Restore {
 				_window_placement = .Restore
 				append(&events_this_frame, Event_Window_Restore{})
@@ -196,27 +196,31 @@ _window_proc :: proc "system" (
 		@(static) high_surrogate: rune
 		w := cast(rune)wparam
 
+		is_high_surrogate := (w >= 0xD800 && w <= 0xDBFF)
+		is_low_surrogate := (w >= 0xDC00 && w <= 0xDFFF)
+
 		codepoint: rune
-		if utf16.is_surrogate(w) {
-			if high_surrogate == 0 {
-				high_surrogate = w
-				break
-			} else {
+		if is_high_surrogate {
+			high_surrogate = w
+			break
+		} else if is_low_surrogate {
+			if high_surrogate != 0 {
 				codepoint = utf16.decode_surrogate_pair(high_surrogate, w)
 				high_surrogate = 0
-
-				// broken/invalid
-				if codepoint == unicode.REPLACEMENT_CHAR {
-					break
-				}
+			} else {
+				// invalid
+				break
 			}
 		} else {
 			codepoint = w
 			high_surrogate = 0
 		}
 
-		// Filter out ctrl chars
-		if unicode.is_print(codepoint) {
+		if codepoint == unicode.REPLACEMENT_CHAR {
+			break
+		}
+
+		if unicode.is_graphic(codepoint) {
 			append(&events_this_frame, cast(Event_Text)codepoint)
 		}
 
@@ -255,12 +259,13 @@ _get_keymod :: proc() -> (mod: Key_Modifiers) {
 	if cast(u16)windows.GetKeyState(windows.VK_SHIFT) & 0x8000 != 0 do mod |= {.Shift}
 	if cast(u16)windows.GetKeyState(windows.VK_CONTROL) & 0x8000 != 0 do mod |= {.Ctrl}
 	if cast(u16)windows.GetKeyState(windows.VK_MENU) & 0x8000 != 0 do mod |= {.Alt}
-	if cast(u16)windows.GetKeyState(windows.VK_CAPITAL) & 1 != 0 do mod |= {.CapsLock}
-	if cast(u16)windows.GetKeyState(windows.VK_NUMLOCK) & 1 != 0 do mod |= {.NumLock}
 
 	lwin := cast(u16)windows.GetKeyState(windows.VK_LWIN) & 0x8000 != 0
 	rwin := cast(u16)windows.GetKeyState(windows.VK_RWIN) & 0x8000 != 0
 	if lwin || rwin do mod |= {.Super}
+
+	if cast(u16)windows.GetKeyState(windows.VK_CAPITAL) & 1 != 0 do mod |= {.CapsLock}
+	if cast(u16)windows.GetKeyState(windows.VK_NUMLOCK) & 1 != 0 do mod |= {.NumLock}
 
 	return mod
 }
