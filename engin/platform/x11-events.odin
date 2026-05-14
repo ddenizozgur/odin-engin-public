@@ -150,14 +150,13 @@ _poll_events_this_frame :: proc() {
 			fmt.println("restore")
 		*/
 
-
-		// case .PropertyNotify:
-		// 	atom := xevent.xproperty.atom
-		// 	if atom == _atoms[._NET_WM_STATE] {
-		// 		fmt.println("cowabunga!")
-		// 	} else if atom == _atoms[.WM_STATE] {
-		// 		fmt.println("minim inş")
-		// 	}
+		case .PropertyNotify:
+			atom := xevent.xproperty.atom
+			if atom == _atoms[._NET_WM_STATE] {
+				fmt.println("cowabunga!")
+			} else if atom == _atoms[.WM_STATE] {
+				fmt.println("minim inş")
+			}
 
 		case .ConfigureNotify:
 			@(static) client_w, client_h: i32

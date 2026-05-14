@@ -225,8 +225,8 @@ _Atom_Names :: enum {
 	UTF8_STRING,
 	_NET_WM_STATE,
 	_NET_WM_STATE_FULLSCREEN,
-	// _NET_WM_STATE_HIDDEN,
-	// WM_STATE,
+	WM_STATE,
+	_NET_WM_STATE_HIDDEN, // minimize
 }
 
 /*
