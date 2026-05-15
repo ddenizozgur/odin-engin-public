@@ -3,22 +3,23 @@
 package platform
 
 import "core:fmt"
+import "core:mem"
 import "core:unicode"
 import "vendor:x11/xlib"
 
 @(private)
 _poll_events_this_frame :: proc() {
 	for xlib.Pending(_display) > 0 {
-		xevent: xlib.XEvent
-		xlib.NextEvent(_display, &xevent)
+		xevnt: xlib.XEvent
+		xlib.NextEvent(_display, &xevnt)
 
-		if xlib.FilterEvent(&xevent, xlib.None) {
+		if xlib.FilterEvent(&xevnt, xlib.None) {
 			continue
 		}
 
-		#partial switch xevent.type {
+		#partial switch xevnt.type {
 		case .KeyPress, .KeyRelease:
-			is_down := xevent.type == .KeyPress
+			is_down := xevnt.type == .KeyPress
 			keysym: xlib.KeySym
 			text_buf: [256]byte
 
@@ -28,7 +29,7 @@ _poll_events_this_frame :: proc() {
 				// This only checks keydown events
 				written := xlib.Xutf8LookupString(
 					_xic,
-					&xevent.xkey,
+					&xevnt.xkey,
 					cast(cstring)&text_buf[0],
 					len(text_buf),
 					&keysym,
@@ -46,11 +47,11 @@ _poll_events_this_frame :: proc() {
 			} else {
 				// XLookupKeysym() cant handle modifiers
 				status: xlib.XComposeStatus
-				xlib.LookupString(&xevent.xkey, &text_buf[0], len(text_buf), &keysym, &status)
+				xlib.LookupString(&xevnt.xkey, &text_buf[0], len(text_buf), &keysym, &status)
 			}
 
 			keycode := _keycode_from_keysym(keysym)
-			keymod := _get_keymod(xevent.xkey.state)
+			keymod := _get_keymod(xevnt.xkey.state)
 
 			#partial switch keycode {
 			case .Ctrl:
@@ -73,8 +74,8 @@ _poll_events_this_frame :: proc() {
 			)
 
 		case .ButtonPress, .ButtonRelease:
-			xbtn := cast(u32)xevent.xbutton.button
-			is_down := xevent.type == .ButtonPress
+			xbtn := cast(u32)xevnt.xbutton.button
+			is_down := xevnt.type == .ButtonPress
 
 			// Scroll event
 			if xbtn >= 4 && xbtn <= 7 {
@@ -127,8 +128,8 @@ _poll_events_this_frame :: proc() {
 			}
 
 		case .MotionNotify:
-			mouse_x := xevent.xmotion.x
-			mouse_y := xevent.xmotion.y
+			mouse_x := xevnt.xmotion.x
+			mouse_y := xevnt.xmotion.y
 			append(&events_this_frame, Event_Mouse_Move{mouse_x, mouse_y})
 
 		// case .EnterNotify:
@@ -151,18 +152,134 @@ _poll_events_this_frame :: proc() {
 		*/
 
 		case .PropertyNotify:
-			atom := xevent.xproperty.atom
-			if atom == _atoms[._NET_WM_STATE] {
-				fmt.println("cowabunga!")
-			} else if atom == _atoms[.WM_STATE] {
-				fmt.println("minim inş")
+			@(static) prev_placement: enum {
+				Restore,
+				Minimize,
+				Maximize,
+			}
+
+			atom := xevnt.xproperty.atom
+			if atom == _atoms[.WM_STATE] {
+				// Minimize, Restore
+				act_type: xlib.Atom
+				act_format: i32
+				nitems: uint
+				bytes_after: uint
+				prop: rawptr
+
+				status := xlib.GetWindowProperty(
+					_display,
+					xevnt.xproperty.window,
+					_atoms[.WM_STATE],
+					0, // Read offset
+					2, // Read amount (2*size_of(u32))
+					false, // delete
+					xlib.AnyPropertyType, // req_type
+					&act_type,
+					&act_format,
+					&nitems,
+					&bytes_after,
+					&prop,
+				)
+
+				if status == 0 && prop != nil {
+					defer xlib.Free(prop)
+
+					if nitems > 0 {
+						state := (cast(^u32)prop)^
+
+						switch state {
+						case 1:
+							if prev_placement != .Restore {
+								append(&events_this_frame, Event_Window_Restore{})
+								prev_placement = .Restore
+							}
+						case 3:
+							if prev_placement != .Minimize { 	// Minimize seems not spammy but whatever
+								append(&events_this_frame, Event_Window_Minimize{})
+								prev_placement = .Minimize
+							}
+						}
+					}
+				}
+			} else if atom == _atoms[._NET_WM_STATE] {
+				// Maximize
+				act_type: xlib.Atom
+				act_format: i32
+				nitems: uint
+				bytes_after: uint
+				prop: rawptr
+
+				status := xlib.GetWindowProperty(
+					_display,
+					xevnt.xproperty.window,
+					_atoms[._NET_WM_STATE],
+					0,
+					32, // Do we need to read that much ??
+					false,
+					xlib.XA_ATOM,
+					&act_type,
+					&act_format,
+					&nitems,
+					&bytes_after,
+					&prop,
+				)
+				/*
+				if bytes_after != 0 {
+					if prop != nil {
+						xlib.Free(prop)
+					}
+
+					status = xlib.GetWindowProperty(
+						_display,
+						xevnt.xproperty.window,
+						_atoms[._NET_WM_STATE],
+						0,
+						64,
+						false,
+						xlib.XA_ATOM,
+						&act_type,
+						&act_format,
+						&nitems,
+						&bytes_after,
+						&prop,
+					)
+				}
+				*/
+
+				if status == 0 && prop != nil {
+					defer xlib.Free(prop)
+
+					// _NET_WM_STATE returns an array of Atoms representing current states
+					atoms := mem.slice_ptr(cast(^xlib.Atom)prop, cast(int)nitems)
+
+					is_max_v := false
+					is_max_h := false
+
+					for atom in atoms {
+						if atom == _atoms[._NET_WM_STATE_MAXIMIZED_VERT] do is_max_v = true
+						if atom == _atoms[._NET_WM_STATE_MAXIMIZED_HORZ] do is_max_h = true
+					}
+
+					if is_max_v && is_max_h { 	// Also maximize is not spammy
+						if prev_placement != .Maximize {
+							append(&events_this_frame, Event_Window_Maximize{})
+							prev_placement = .Maximize
+						}
+					} else {
+						if prev_placement == .Maximize {	// Only fire if maximize ??
+							append(&events_this_frame, Event_Window_Restore{})
+							prev_placement = .Restore
+						}
+					}
+				}
 			}
 
 		case .ConfigureNotify:
 			@(static) client_w, client_h: i32
 
-			new_w := xevent.xconfigure.width
-			new_h := xevent.xconfigure.height
+			new_w := xevnt.xconfigure.width
+			new_h := xevnt.xconfigure.height
 
 			if new_w != client_w || new_h != client_h {
 				// not so spammy btw but just in case
@@ -171,7 +288,7 @@ _poll_events_this_frame :: proc() {
 			}
 
 		case .ClientMessage:
-			atom := cast(xlib.Atom)xevent.xclient.data.l[0]
+			atom := cast(xlib.Atom)xevnt.xclient.data.l[0]
 			if atom == _atoms[.WM_DELETE_WINDOW] {
 				append(&events_this_frame, Event_Window_Close{})
 			} else if atom == _atoms[._NET_WM_SYNC_REQUEST] {

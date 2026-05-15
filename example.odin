@@ -30,8 +30,8 @@ to_update :: proc(dt: f32) -> bool {
 	@(static) et: f32
 	defer et += dt
 
-	client_size := cast([2]f32)platform.get_client_size()
-	mouse_pos := cast([2]f32)platform.get_mouse_pos()
+	client_size := linalg.to_f32(platform.get_client_size())
+	mouse_pos := linalg.to_f32(platform.get_mouse_pos())
 
 	{
 		render.IMM_FRAME_SCOPED()
@@ -39,7 +39,7 @@ to_update :: proc(dt: f32) -> bool {
 		// render.clear_target(render.NAYSAYER_BG)
 		aurora_bg(et)
 
-		// torture_test_liquid_neon(font, et)
+		torture_test_liquid_neon(font, et)
 
 		// render.ui_to_test(font)
 
@@ -57,6 +57,7 @@ main :: proc() {
 	platform.window_init("Kralsın", {1280, 800})
 	defer platform.window_free()
 	platform.gl_load()
+	platform.gl_swap_interval(0)
 
 	prev_time := time.now()
 
@@ -68,7 +69,8 @@ main :: proc() {
 
 		platform.poll_events_this_frame()
 		for evnt in platform.events_this_frame {
-			// input_demo(evnt)
+			input_demo(evnt)
+
 			#partial switch data in evnt {
 			case platform.Event_Window_Close:
 				break frame_loop
@@ -148,7 +150,7 @@ input_demo :: proc(evnt: platform.Event) {
 	case platform.Event_Key:
 	// fmt.printfln("[Key] %v", data)
 	case platform.Event_Text:
-		fmt.printfln("[Text] %v", data)
+	// fmt.printfln("[Text] %v", data)
 	case platform.Event_Mouse_Button:
 	// fmt.printfln("[Button] %v", data)
 	case platform.Event_Mouse_Move:
@@ -160,11 +162,11 @@ input_demo :: proc(evnt: platform.Event) {
 	case platform.Event_Window_UnFocus:
 	// fmt.printfln("[UnFocus] %v", data)
 	case platform.Event_Window_Minimize:
-	// fmt.printfln("[Minimize] %v", data)
+		fmt.printfln("[Minimize] %v", data)
 	case platform.Event_Window_Restore:
-	// fmt.printfln("[Restore] %v", data)
+		fmt.printfln("[Restore] %v", data)
 	case platform.Event_Window_Maximize:
-	// fmt.printfln("[Maximize] %v", data)
+		fmt.printfln("[Maximize] %v", data)
 	case platform.Event_Window_Close:
 	// fmt.printfln("[Close] %v", data)
 	}
@@ -172,7 +174,7 @@ input_demo :: proc(evnt: platform.Event) {
 
 
 aurora_bg :: proc(et: f32) {
-	client := cast([2]f32)platform.get_client_size()
+	client_size := linalg.to_f32(platform.get_client_size())
 
 	s1 := math.sin_f32(et * 0.15)
 	s2 := math.cos_f32(et * 0.22)
@@ -186,7 +188,7 @@ aurora_bg :: proc(et: f32) {
 
 	render.imm_push_rect_grad(
 		{0, 0},
-		client,
+		client_size,
 		render.vec4f32_to_rgba32(tl),
 		render.vec4f32_to_rgba32(tr),
 		render.vec4f32_to_rgba32(bl),
@@ -195,7 +197,7 @@ aurora_bg :: proc(et: f32) {
 }
 
 torture_test_liquid_neon :: proc(font: render.Font, et: f32) {
-	client_size := cast([2]f32)platform.get_client_size()
+	client_size := linalg.to_f32(platform.get_client_size())
 
 	cols := 40
 	rows := 25
