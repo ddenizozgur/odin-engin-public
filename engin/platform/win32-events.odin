@@ -199,7 +199,7 @@ _window_proc :: proc "system" (
 		is_high_surrogate := (w >= 0xD800 && w <= 0xDBFF)
 		is_low_surrogate := (w >= 0xDC00 && w <= 0xDFFF)
 
-		codepoint: rune
+		codepoint := unicode.REPLACEMENT_CHAR
 		if is_high_surrogate {
 			high_surrogate = w
 			break
