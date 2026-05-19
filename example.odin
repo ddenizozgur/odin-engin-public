@@ -39,11 +39,11 @@ to_update :: proc(dt: f32) -> bool {
 		// render.clear_target(render.NAYSAYER_BG)
 		aurora_bg(et)
 
-		// torture_test_liquid_neon(font, et)
+		liq_neon(font, et)
 
 		// render.ui_to_test(font)
 
-		draw_some_text(font, {0, 0}, 1, render.RAYWHITE)
+		// draw_some_text(font, {0, 0}, 1, render.RAYWHITE)
 
 		draw_fps(font, {client_size.x, 0}, 20, dt, .TopRight)
 	}
@@ -194,7 +194,47 @@ aurora_bg :: proc(et: f32) {
 	)
 }
 
-torture_test_liquid_neon :: proc(font: render.Font, et: f32) {
+torture_gpu :: proc(et: f32) {
+	client_size := cast([2]f32)platform.get_client_size()
+
+	num_spiral := 50000
+	center := client_size * 0.5
+
+	for i in 0 ..< num_spiral {
+		fi := f32(i)
+
+		// Spiral math
+		angle := fi * 0.1 + et * 2.0
+		radius := fi * 0.15
+
+		pos := center + [2]f32{math.cos(angle) * radius, math.sin(angle) * radius}
+
+		// Rotating/breathing size
+		size := [2]f32 {
+			60.0 + math.sin(et * 3.0 + fi * 0.01) * 40.0,
+			60.0 + math.cos(et * 3.0 + fi * 0.01) * 40.0,
+		}
+
+		// Center the rectangle on the spiral point
+		pos.x -= size.x * 0.5
+		pos.y -= size.y * 0.5
+
+		// Extremely low alpha (0.05) to test blending and overdraw
+		color := [4]f32 {
+			math.cos(et + fi * 0.001) * 0.5 + 0.5,
+			math.sin(et + fi * 0.002) * 0.5 + 0.5,
+			math.sin(et + fi * 0.003) * 0.5 + 0.5,
+			0.05,
+		}
+
+		// Max radius for pill-like shapes
+		cradii := min(size.x, size.y) * 0.5
+
+		render.imm_push_rect(pos, size, render.vec4f32_to_rgba32(color), cradii)
+	}
+}
+
+liq_neon :: proc(font: render.Font, et: f32) {
 	client_size := cast([2]f32)platform.get_client_size()
 
 	cols := 40
