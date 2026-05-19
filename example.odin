@@ -196,7 +196,6 @@ aurora_bg :: proc(et: f32) {
 	)
 }
 
-<<<<<<< HEAD
 torture_gpu :: proc(et: f32) {
 	client_size := cast([2]f32)platform.get_client_size()
 
@@ -239,10 +238,6 @@ torture_gpu :: proc(et: f32) {
 
 liq_neon :: proc(font: render.Font, et: f32) {
 	client_size := cast([2]f32)platform.get_client_size()
-=======
-torture_test_liquid_neon :: proc(font: render.Font, et: f32) {
-	client_size := linalg.to_f32(platform.get_client_size())
->>>>>>> d40a086b9788d07bb7d4e2990fc7793311efde28
 
 	cols := 40
 	rows := 25
