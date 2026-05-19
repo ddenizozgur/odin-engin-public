@@ -66,7 +66,7 @@ RAYWHITE :: RGBA32{245, 245, 245, 255}
 NAYSAYER_BG :: RGBA32{7, 38, 38, 255}
 
 rgba32_to_vec4f32 :: #force_inline proc(c: RGBA32) -> [4]f32 {
-	return cast([4]f32)c * (1.0 / 255.0)
+	return linalg.to_f32(c) * (1.0 / 255.0)
 }
 
 vec4f32_to_rgba32 :: #force_inline proc(v: [4]f32) -> RGBA32 {

@@ -45,17 +45,23 @@ _window_proc :: proc "system" (
 	// 	result = 1
 
 	case windows.WM_SIZE:
+		@(static) prev_placement: enum {
+			Restore,
+			Minimize,
+			Maximize,
+		}
+
 		switch wparam {
 		case windows.SIZE_MINIMIZED:
-			_window_placement = .Minimize
 			append(&events_this_frame, Event_Window_Minimize{})
+			prev_placement = .Minimize
 		case windows.SIZE_MAXIMIZED:
-			_window_placement = .Maximize
 			append(&events_this_frame, Event_Window_Maximize{})
+			prev_placement = .Maximize
 		case windows.SIZE_RESTORED:
-			if _window_placement != .Restore {
-				_window_placement = .Restore
+			if prev_placement != .Restore {
 				append(&events_this_frame, Event_Window_Restore{})
+				prev_placement = .Restore
 			}
 		}
 
@@ -244,13 +250,6 @@ _window_proc :: proc "system" (
 // const bool swapped = (TRUE == GetSystemMetrics(SM_SWAPBUTTON));
 // check for swapped mouse buttons???
 // TODO: check for swapped mouse buttons???
-@(private = "file")
-_window_placement: enum {
-	Restore,
-	Minimize,
-	Maximize,
-}
-
 @(private = "file")
 _MOUSE_SCROLL_NORMVAL :: f32(120)
 

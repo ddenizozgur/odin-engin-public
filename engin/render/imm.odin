@@ -152,7 +152,7 @@ imm_push_image_ex :: proc(
 }
 
 imm_push_image :: proc(texture: Texture, pos, size: [2]f32, tint := WHITE, roundness: f32 = 0) {
-	imm_push_image_ex(texture, {0, 0}, cast([2]f32)texture.size, pos, size, tint, roundness)
+	imm_push_image_ex(texture, {0, 0}, linalg.to_f32(texture.size), pos, size, tint, roundness)
 }
 
 /*
